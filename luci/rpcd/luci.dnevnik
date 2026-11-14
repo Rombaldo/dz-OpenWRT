@@ -68,6 +68,35 @@ def uci(path):
         return ""
 
 
+def lan_ip():
+    """Адрес роутера в домашней сети: сначала тот, что он получил на деле (годится и когда адрес выдан по DHCP), потом из настроек."""
+    try:
+        r = subprocess.run(["ubus", "call", "network.interface.lan", "status"], capture_output=True, text=True, timeout=5)
+        ip = (json.loads(r.stdout).get("ipv4-address") or [{}])[0].get("address") or ""
+    except (OSError, subprocess.SubprocessError, ValueError, AttributeError, IndexError, TypeError):
+        ip = ""
+    return ip or (uci("network.lan.ipaddr") or "").split("/")[0]
+
+
+def update_result():
+    """Чем кончилось обновление программы, по его журналу. Пусто, пока оно идёт или его не запускали.
+    {"state": "ok", "version": …} | {"state": "failed", "message": …}, плюс "age": сколько секунд назад оно закончилось."""
+    if alive(UPDATE_PID):
+        return {}
+    text = read_text(UPDATE_LOG)
+    if not text.strip():
+        return {}
+    try:
+        age = max(0, int(time.time() - os.path.getmtime(UPDATE_LOG)))
+    except OSError:
+        age = 0
+    done = re.search(r"==> Готово: версия (\d+\.\d+\.\d+)", text)
+    if done:
+        return {"state": "ok", "version": done.group(1), "age": age}
+    errors = [l.strip() for l in text.splitlines() if l.startswith("ОШИБКА")]
+    return {"state": "failed", "age": age, "message": (errors[-1] if errors else "обновление оборвалось, не дойдя до конца")[:240]}
+
+
 # ---------- расписание в cron ----------
 def read_schedule():
     """(каждые N минут, с какого часа, до какого часа не включая). Если строки нет или она необычная, то 20, 6, 23."""
@@ -117,7 +146,7 @@ def status(_):
     st, student = page.get("status") or {}, page.get("student") or {}
     every, start, end = read_schedule()
     domain = os.environ.get("DNEVNIK_DOMAIN") or uci("dhcp.@dnsmasq[0].domain") or "lan"
-    ip = (uci("network.lan.ipaddr") or "").split("/")[0]
+    ip = lan_ip()
     try:
         import core
         can_restore = bool(core.backup_available(DATA))
@@ -138,7 +167,7 @@ def status(_):
         "updatedAt": page.get("updatedAt"), "days": len(page.get("days") or []),
         "needLogin": bool(st.get("needLogin")), "error": st.get("error"),
         "student": student.get("name") or "", "school": student.get("school") or "",
-        "syncing": alive(SYNC_LOCK), "updating": alive(UPDATE_PID), "canRestore": can_restore,
+        "syncing": alive(SYNC_LOCK), "updating": alive(UPDATE_PID), "updateResult": update_result(), "canRestore": can_restore,
         "every": every, "from": start, "to": end, "name": name,
         "nextIn": next_run_in(every, start, end), "now": int(time.time()),
         "url": f"http://dnevnik.{domain}", "urlIp": f"http://{ip}:8765" if ip else "",

@@ -338,6 +338,64 @@ class PluginTests(PluginCase):
         self.assertFalse(self.call("update")["ok"])                                        # второй запуск не принимается
         self.assertIn("обновление программы", self.call("log", {"which": "update"})["text"])
 
+    # --- итог обновления программы и адрес по DHCP ---
+    def write_update_log(self, text, pid=None):
+        (self.run_dir / "dnevnik-update.log").write_text(text)
+        if pid is not None:
+            (self.run_dir / "dnevnik-update.pid").write_text(str(pid))
+
+    def test_update_result_is_empty_when_nothing_was_started(self):
+        self.assertEqual(self.call("status")["updateResult"], {})
+
+    def test_update_result_success_failure_and_cut_off(self):
+        self.write_update_log("--- 2026-11-14 21:55:13 обновление программы\n==> Проверяю Python…\n==> Готово: версия 0.21.2.\n    Страница: http://dnevnik.lan\n")
+        r = self.call("status")["updateResult"]
+        self.assertEqual((r["state"], r["version"]), ("ok", "0.21.2"))
+        self.assertLess(r["age"], 60)
+        self.write_update_log("--- x\n==> Скачиваю…\nОШИБКА: не скачалось (Rombaldo/dnevnik-OpenWRT, main).\n")
+        r = self.call("status")["updateResult"]
+        self.assertEqual(r["state"], "failed")
+        self.assertIn("не скачалось", r["message"])
+        self.write_update_log("--- x\n==> Скачиваю…\n")                                   # оборвалось (перезагрузка, пропало питание)
+        r = self.call("status")["updateResult"]
+        self.assertEqual(r["state"], "failed")
+        self.assertIn("оборвалось", r["message"])
+
+    def test_update_result_is_empty_while_the_installer_is_running(self):
+        self.write_update_log("--- x\n==> Готово: версия 9.9.9.\n", pid=os.getpid())      # процесс жив: итога ещё нет
+        s = self.call("status")
+        self.assertTrue(s["updating"])
+        self.assertEqual(s["updateResult"], {})
+
+    def test_update_result_text_from_the_log_is_bounded(self):
+        self.write_update_log("ОШИБКА: " + "я" * 5000 + "\n")
+        self.assertLessEqual(len(self.call("status")["updateResult"]["message"]), 240)
+
+    def test_address_given_by_dhcp_is_shown_through_ubus(self):
+        """Раньше адрес по цифрам брался только из настроек и на роутере с lan по DHCP строка в LuCI была пустой."""
+        bin_dir = self.tmp / "fakebin"
+        bin_dir.mkdir()
+        ubus = bin_dir / "ubus"
+        ubus.write_text("#!/bin/sh\necho '{\"up\": true, \"ipv4-address\": [{\"address\": \"192.168.1.77\", \"mask\": 24}]}'\n")
+        ubus.chmod(0o755)
+        uci = bin_dir / "uci"
+        uci.write_text("#!/bin/sh\nexit 1\n")                                              # в настройках адреса нет
+        uci.chmod(0o755)
+        self.env["PATH"] = f"{bin_dir}:{os.environ['PATH']}"
+        self.assertEqual(self.call("status")["urlIp"], "http://192.168.1.77:8765")
+
+    def test_address_falls_back_to_the_setting_and_survives_garbage(self):
+        bin_dir = self.tmp / "fakebin"
+        bin_dir.mkdir()
+        ubus = bin_dir / "ubus"
+        ubus.write_text("#!/bin/sh\necho 'not json'\n")
+        ubus.chmod(0o755)
+        uci = bin_dir / "uci"
+        uci.write_text("#!/bin/sh\n[ \"$3\" = network.lan.ipaddr ] && echo 192.168.5.1/24\nexit 0\n")
+        uci.chmod(0o755)
+        self.env["PATH"] = f"{bin_dir}:{os.environ['PATH']}"
+        self.assertEqual(self.call("status")["urlIp"], "http://192.168.5.1:8765")
+
     def test_log_returns_the_tail(self):
         (self.run_dir / "dnevnik-sync.log").write_text("\n".join(f"строка {i}" for i in range(100)))
         text = self.call("log", {"which": "sync"})["text"]
@@ -570,6 +628,58 @@ class ViewTests(unittest.TestCase):
         page = self.open(answers={"check_update": {"ok": False, "message": "Нет связи с GitHub."}})
         page.click("text=Проверить новую версию")
         page.wait_for_selector("text=Нет связи с GitHub.")
+
+    # --- итог обновления программы на странице (раньше «запущено» висело вечно) ---
+    def poll_all(self, page):
+        page.evaluate("Promise.all(window.pollFns.map(f => f()))")
+
+    def test_update_finished_replaces_the_started_message_and_hides_the_stale_button(self):
+        page = self.open(answers={"check_update": {"ok": True, "current": "0.12.0", "latest": "0.12.1", "newer": True}})
+        page.click("text=Проверить новую версию"); page.wait_for_selector("text=Обновить до 0.12.1")
+        page.click("text=Обновить до 0.12.1"); page.click("#modal button.cbi-button-action")
+        page.evaluate("window.mockStatus = Object.assign({}, window.mockStatus, {updating: true})")
+        self.poll_all(page)
+        self.assertIn("Обновляется программа", page.inner_text(".dn-pill"))
+        page.evaluate("window.mockStatus = Object.assign({}, window.mockStatus, {updating: false, version: '0.12.1', updateResult: {state: 'ok', version: '0.12.1', age: 3}})")
+        self.poll_all(page)
+        page.wait_for_selector("text=Обновление завершено: установлена версия 0.12.1.")
+        self.assertFalse(page.is_visible("text=Обновить до"))
+        self.assertNotIn("запущено", page.inner_text(".dn"))
+        self.assertEqual(self.errors, [])
+
+    def test_update_that_finishes_before_the_first_poll_is_still_reported(self):
+        page = self.open(answers={"check_update": {"ok": True, "current": "0.12.0", "latest": "0.12.1", "newer": True}})
+        page.click("text=Проверить новую версию"); page.wait_for_selector("text=Обновить до 0.12.1")
+        page.evaluate("window.mockStatus = Object.assign({}, window.mockStatus, {updating: false, version: '0.12.1', updateResult: {state: 'ok', version: '0.12.1', age: 1}})")
+        page.click("text=Обновить до 0.12.1"); page.click("#modal button.cbi-button-action")
+        page.wait_for_selector("text=Обновление завершено")
+
+    def test_failed_update_is_shown_with_the_reason_and_opens_the_update_log(self):
+        page = self.open({"updating": True})
+        page.evaluate("window.mockStatus = Object.assign({}, window.mockStatus, {updating: false, updateResult: {state: 'failed', message: 'ОШИБКА: не скачалось', age: 2}})")
+        self.poll_all(page)
+        page.wait_for_selector(".dn-note.bad")
+        self.assertIn("Обновление не удалось: ОШИБКА: не скачалось", page.inner_text(".dn-note.bad"))
+        self.assertIn("update", page.evaluate("[...document.querySelectorAll('select')].map(s => s.value)"))
+
+    def test_recent_result_is_shown_on_opening_but_an_old_one_is_not(self):
+        page = self.open({"updateResult": {"state": "ok", "version": "0.12.0", "age": 90}})
+        self.assertIn("Обновление завершено: установлена версия 0.12.0.", page.inner_text(".dn"))
+        page = self.open({"updateResult": {"state": "ok", "version": "0.12.0", "age": 7200}})
+        self.assertNotIn("Обновление завершено", page.inner_text(".dn"))
+        page = self.open({"updateResult": {"state": "failed", "message": "ОШИБКА: x", "age": 10}})
+        self.assertIn("Обновление не удалось", page.inner_text(".dn"))
+
+    def test_no_result_while_it_is_still_running(self):
+        page = self.open({"updating": True, "updateResult": {}})
+        self.assertNotIn("Обновление завершено", page.inner_text(".dn"))
+        self.assertNotIn("Обновление не удалось", page.inner_text(".dn"))
+
+    def test_result_text_from_the_router_is_not_executed(self):
+        page = self.open({"updateResult": {"state": "failed", "message": '<img src=x onerror="window.pwned=1">', "age": 5}})
+        self.assertIsNone(page.query_selector(".dn img"))
+        self.assertIsNone(page.evaluate("window.pwned"))
+        self.assertIn("<img", page.inner_text(".dn"))
 
     def pform(self, page):
         return page.query_selector_all(".dn-pform input")

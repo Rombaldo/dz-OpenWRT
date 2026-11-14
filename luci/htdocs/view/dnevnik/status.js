@@ -233,8 +233,28 @@ return view.extend({
 		return [ 'ok', 'Работает' ];
 	},
 
+	// Чем кончилось обновление программы: пишем итог на месте надписи «запущено», иначе она висит вечно.
+	// Итог показываем, когда обновление закончилось на наших глазах, и при открытии страницы, если оно закончилось недавно.
+	showUpdateResult: function(st) {
+		var r = this.refs, u = st.updateResult || {};
+		if (u.state === 'ok') {
+			r.updbtn.style.display = 'none';
+			this.say(r.updnote, 'ok', 'Обновление завершено: установлена версия ' + (u.version || st.version) + '.');
+		} else if (u.state === 'failed') {
+			r.which.value = 'update';
+			this.say(r.updnote, 'bad', 'Обновление не удалось: ' + (u.message || 'причина неизвестна') + ' Подробности в журнале ниже.');
+		} else {
+			this.say(r.updnote, 'warn', 'Обновление закончилось, но итог определить не удалось. Смотрите журнал ниже.');
+		}
+	},
+
 	paint: function(st) {
 		var r = this.refs, p = this.pill(st);
+		var u = st.updateResult || {};
+		if (this.wasUpdating && !st.updating) this.showUpdateResult(st);
+		else if (this.wasUpdating === undefined && !st.updating && u.state && u.age < 1800) this.showUpdateResult(st);
+		this.wasUpdating = !!st.updating;
+		if (r.updbtn.getAttribute('data-latest') && st.version === r.updbtn.getAttribute('data-latest')) r.updbtn.style.display = 'none';   // эта версия уже стоит
 		this.st = st;
 		r.pill.className = 'dn-pill ' + p[0];
 		r.pill.textContent = p[1];
@@ -292,6 +312,7 @@ return view.extend({
 			if (!res.newer) return self.say(r.updnote, 'ok', 'Установлена последняя версия: ' + res.current + '.');
 			self.say(r.updnote, 'warn', 'Есть новая версия ' + res.latest + ' (у вас ' + res.current + ').');
 			r.updbtn.textContent = 'Обновить до ' + res.latest;
+			r.updbtn.setAttribute('data-latest', res.latest);
 			r.updbtn.style.display = '';
 		});
 	},
@@ -306,7 +327,7 @@ return view.extend({
 					ui.hideModal();
 					return call.update().then(function(r) {
 						self.say(self.refs.updnote, r.ok ? 'ok' : 'bad', r.message);
-						if (r.ok) { self.refs.which.value = 'update'; }
+						if (r.ok) { self.refs.which.value = 'update'; self.wasUpdating = true; }       // даже если закончится до первого опроса, итог покажем
 						return self.poll();
 					});
 				} }, 'Обновить')
