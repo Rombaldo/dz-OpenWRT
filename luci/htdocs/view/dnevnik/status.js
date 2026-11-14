@@ -37,6 +37,10 @@ var STYLE =
 	'.dn-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}' +
 	'.dn-note{font-size:13px;padding:10px 12px;border-radius:8px;background:var(--dn-soft);margin:12px 0 0}' +
 	'.dn-note.ok{color:var(--dn-ok)}.dn-note.warn{color:var(--dn-warn)}.dn-note.bad{color:var(--dn-bad)}' +
+	'.dn-bar{height:10px;border-radius:6px;background:var(--dn-soft);overflow:hidden;margin:12px 0 6px}' +
+	'.dn-fill{height:100%;width:0;background:var(--dn-ok);border-radius:6px;transition:width .6s ease}' +
+	'.dn-bartext{font-size:13px;margin:0}' +
+	'.dn-news{font-size:13px;margin:10px 0 0;padding:8px 12px;border-left:3px solid var(--dn-line)}.dn-news b{display:block;margin:6px 0 2px}.dn-news ul{margin:0 0 4px 18px;padding:0}.dn-news li{margin:2px 0}' +
 	'.dn-form{display:grid;grid-template-columns:minmax(150px,220px) minmax(0,1fr);gap:10px 12px;align-items:center;font-size:14px}' +
 	'.dn-form select,.dn-form input{max-width:240px;min-width:0}' +
 	'@media(max-width:600px){.dn-form{grid-template-columns:minmax(0,1fr)}.dn-form select,.dn-form input{max-width:none;width:100%}.dn-head{flex-wrap:wrap}}' +
@@ -235,12 +239,14 @@ return view.extend({
 
 	// Чем кончилось обновление программы: пишем итог на месте надписи «запущено», иначе она висит вечно.
 	// Итог показываем, когда обновление закончилось на наших глазах, и при открытии страницы, если оно закончилось недавно.
-	showUpdateResult: function(st) {
+	showUpdateResult: function(st, live) {
 		var r = this.refs, u = st.updateResult || {};
 		if (u.state === 'ok') {
 			r.updbtn.style.display = 'none';
+			if (live) return this.finishUpdate(u.version || st.version);
 			this.say(r.updnote, 'ok', 'Обновление завершено: установлена версия ' + (u.version || st.version) + '.');
 		} else if (u.state === 'failed') {
+			r.progress.style.display = 'none';
 			r.which.value = 'update';
 			this.say(r.updnote, 'bad', 'Обновление не удалось: ' + (u.message || 'причина неизвестна') + ' Подробности в журнале ниже.');
 		} else {
@@ -248,12 +254,76 @@ return view.extend({
 		}
 	},
 
+	// Полоса хода обновления: подписи и проценты приходят от роутера (по журналу установщика).
+	paintProgress: function(st) {
+		var r = this.refs, up = st.updateProgress || {};
+		if (st.updating) {
+			var pc = Math.max(1, Math.min(99, Number(up.percent) || 3));
+			r.progress.style.display = '';
+			r.fill.style.width = pc + '%';
+			r.bartext.textContent = pc + '% · ' + (up.text || 'Обновляю…');
+			this.startFast();
+		} else if (!this.finishing) {
+			r.progress.style.display = 'none';
+		}
+	},
+
+	// Пока идёт обновление, опрашиваем состояние чаще обычного, чтобы полоса двигалась.
+	startFast: function() {
+		var self = this;
+		if (this.fastTimer) return;
+		this.fastTimer = window.setInterval(function() {
+			if (!self.st || !self.st.updating) { window.clearInterval(self.fastTimer); self.fastTimer = null; return; }
+			self.poll();
+		}, this.fastMs || 1500);
+	},
+
+	// Обновление установлено: страница сама качает свежие файлы мимо кэша и выходит из LuCI, чтобы вход подхватил новую версию.
+	finishUpdate: function(version) {
+		var self = this, r = this.refs;
+		this.finishing = true;
+		r.progress.style.display = '';
+		r.fill.style.width = '100%';
+		r.bartext.textContent = '100% · Обновление установлено';
+		this.say(r.updnote, 'ok', 'Обновление до версии ' + version + ' установлено. Обновляю файлы страницы…');
+		return this.refreshResources().then(function() {
+			self.say(r.updnote, 'ok', 'Обновление установлено. Выходим из системы, чтобы применить его: войдите снова.');
+			window.setTimeout(function() { self.logoutNow(); }, self.logoutMs || 1500);
+		});
+	},
+
+	refreshResources: function() {
+		if (typeof fetch !== 'function' || typeof L === 'undefined' || !L.resource) return Promise.resolve();
+		return fetch(L.resource('view/dnevnik/status.js'), { cache: 'reload', credentials: 'same-origin' }).catch(function() {});
+	},
+
+	logoutNow: function() {
+		var u = (typeof L !== 'undefined' && L.url) ? L.url('admin/logout') : '';
+		if (u) this.goTo(u); else this.reloadPage();
+	},
+	goTo: function(url) { window.location.href = url; },
+	reloadPage: function() { window.location.reload(); },
+
+	renderNews: function(res) {
+		var box = this.refs.news;
+		while (box.firstChild) box.removeChild(box.firstChild);
+		var notes = (res && res.notes) || [];
+		if (!res || !res.newer || !notes.length) { box.style.display = 'none'; return; }
+		box.appendChild(E('div', { 'class': 'dn-k' }, 'Что нового'));
+		notes.forEach(function(n) {
+			box.appendChild(E('b', {}, 'Версия ' + n.version + (n.date ? ' · ' + n.date : '')));
+			box.appendChild(E('ul', {}, (n.items || []).map(function(t) { return E('li', {}, t); })));
+		});
+		box.style.display = '';
+	},
+
 	paint: function(st) {
 		var r = this.refs, p = this.pill(st);
 		var u = st.updateResult || {};
-		if (this.wasUpdating && !st.updating) this.showUpdateResult(st);
-		else if (this.wasUpdating === undefined && !st.updating && u.state && u.age < 1800) this.showUpdateResult(st);
+		if (this.wasUpdating && !st.updating && !this.finishing) this.showUpdateResult(st, true);
+		else if (this.wasUpdating === undefined && !st.updating && u.state && u.age < 1800) this.showUpdateResult(st, false);
 		this.wasUpdating = !!st.updating;
+		this.paintProgress(st);
 		if (r.updbtn.getAttribute('data-latest') && st.version === r.updbtn.getAttribute('data-latest')) r.updbtn.style.display = 'none';   // эта версия уже стоит
 		this.st = st;
 		r.pill.className = 'dn-pill ' + p[0];
@@ -306,6 +376,7 @@ return view.extend({
 	doCheck: function() {
 		var self = this, r = this.refs;
 		self.say(r.updnote, '', 'Проверяю…');
+		self.renderNews(null);
 		return call.check_update().then(function(res) {
 			r.updbtn.style.display = 'none';
 			if (!res.ok) return self.say(r.updnote, 'warn', res.message);
@@ -314,20 +385,24 @@ return view.extend({
 			r.updbtn.textContent = 'Обновить до ' + res.latest;
 			r.updbtn.setAttribute('data-latest', res.latest);
 			r.updbtn.style.display = '';
+			self.renderNews(res);
 		});
 	},
 
 	doUpdate: function() {
 		var self = this;
 		ui.showModal('Обновить программу?', [
-			E('p', 'Роутер скачает новую версию с GitHub и поставит её. Вход и данные не трогаются. Страница дневника на минуту может не открываться.'),
+			E('p', 'Роутер скачает новую версию с GitHub и поставит её. Вход и данные не трогаются. Страница дневника на минуту может не открываться. После установки вы выйдете из LuCI и войдёте заново: так подхватывается новая версия страницы.'),
 			E('div', { 'class': 'right' }, [
 				E('button', { 'class': 'cbi-button', click: ui.hideModal }, 'Отмена'), ' ',
 				E('button', { 'class': 'cbi-button cbi-button-action', click: function() {
 					ui.hideModal();
 					return call.update().then(function(r) {
 						self.say(self.refs.updnote, r.ok ? 'ok' : 'bad', r.message);
-						if (r.ok) { self.refs.which.value = 'update'; self.wasUpdating = true; }       // даже если закончится до первого опроса, итог покажем
+						if (r.ok) {
+							self.refs.which.value = 'update'; self.wasUpdating = true; self.finishing = false;   // даже если закончится до первого опроса, итог покажем
+							self.refs.progress.style.display = ''; self.refs.fill.style.width = '3%'; self.refs.bartext.textContent = '3% · Запускаю обновление…';
+						}
 						return self.poll();
 					});
 				} }, 'Обновить')
@@ -422,6 +497,10 @@ return view.extend({
 		r.link2 = E('a', { href: '#', target: '_blank', rel: 'noopener' }, '');
 		r.note = E('div', { 'class': 'dn-note', style: 'display:none' });
 		r.updnote = E('div', { 'class': 'dn-note', style: 'display:none' });
+		r.news = E('div', { 'class': 'dn-news', style: 'display:none' });
+		r.fill = E('div', { 'class': 'dn-fill' });
+		r.bartext = E('p', { 'class': 'dn-bartext' });
+		r.progress = E('div', { style: 'display:none' }, [ E('div', { 'class': 'dn-bar' }, [ r.fill ]), r.bartext ]);
 		r.savenote = E('div', { 'class': 'dn-note', style: 'display:none' });
 		r.refresh = E('button', { 'class': 'cbi-button cbi-button-action', click: function() { return self.doRefresh(); } }, 'Обновить сейчас');
 		r.check = E('button', { 'class': 'cbi-button', click: function() { return self.doCheck(); } }, 'Проверить новую версию');
@@ -477,7 +556,7 @@ return view.extend({
 					kv('Последнее обновление', val('updated')), kv('Следующее обновление', val('next')), kv('Адрес страницы', linkBox)
 				]),
 				E('div', { 'class': 'dn-btns' }, [ r.open, r.refresh, r.check, r.updbtn, r.logout, r.restore ]),
-				r.note, r.updnote
+				r.note, r.updnote, r.news, r.progress
 			]),
 			E('div', { 'class': 'dn-card' }, [
 				E('div', { 'class': 'dn-head' }, [ E('p', { 'class': 'dn-title' }, 'Пароль семьи'), r.fpill ]),

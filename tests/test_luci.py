@@ -396,6 +396,120 @@ class PluginTests(PluginCase):
         self.env["PATH"] = f"{bin_dir}:{os.environ['PATH']}"
         self.assertEqual(self.call("status")["urlIp"], "http://192.168.5.1:8765")
 
+    # --- список изменений, запасной прокси, ход обновления ---
+    CHANGELOG = ("# История версий\n\nФормат: номер версии.\n\n"
+                 "## 0.12.3 — 2026-11-16\n- **Третье**: самое новое, с `кодом` и **жирным**.\n- Ещё одно.\n\n"
+                 "## 0.12.2 — 2026-11-15\nОписание без пункта.\n- Второе изменение.\n\n"
+                 "## 0.12.1 — 2026-11-14\n- Первое изменение.\n\n"
+                 "## 0.12.0 — 2026-11-13\n- Уже установленная версия.\n\n## 0.11.0 — 2026-11-01\n- Старая.\n")
+
+    def set_changelog(self, text=None):
+        f = self.tmp / "remote-changelog"
+        f.write_text(self.CHANGELOG if text is None else text)
+        self.env["DNEVNIK_CHANGELOG_URL"] = f.as_uri()
+
+    def test_check_update_lists_what_is_new_between_the_versions(self):
+        self.set_changelog()
+        (self.tmp / "remote-version").write_text("0.12.3\n")
+        r = self.call("check_update")
+        self.assertTrue(r["newer"], r)
+        self.assertEqual([n["version"] for n in r["notes"]], ["0.12.3", "0.12.2", "0.12.1"])          # без 0.12.0 и старше
+        self.assertEqual(r["notes"][0]["date"], "2026-11-16")
+        self.assertEqual(r["notes"][0]["items"], ["Третье: самое новое, с кодом и жирным.", "Ещё одно."])  # разметка снята
+        self.assertEqual(r["notes"][1]["items"], ["Второе изменение."])
+
+    def test_notes_stop_at_the_latest_version_not_beyond(self):
+        self.set_changelog()
+        (self.tmp / "remote-version").write_text("0.12.1\n")
+        self.assertEqual([n["version"] for n in self.call("check_update")["notes"]], ["0.12.1"])
+
+    def test_no_notes_when_up_to_date_or_changelog_is_missing_or_broken(self):
+        self.set_changelog()
+        self.assertEqual(self.call("check_update")["notes"], [])                                   # 0.12.0 уже стоит
+        (self.tmp / "remote-version").write_text("0.12.1\n")
+        self.env["DNEVNIK_CHANGELOG_URL"] = (self.tmp / "no-such-file").as_uri()
+        r = self.call("check_update")
+        self.assertTrue(r["ok"] and r["newer"], r)                                                 # без списка обновиться можно
+        self.assertEqual(r["notes"], [])
+        self.set_changelog("мусор без заголовков\n- пункт\n")
+        self.assertEqual(self.call("check_update")["notes"], [])
+
+    def test_notes_are_bounded(self):
+        many = "".join(f"## 0.13.{i} — d\n- " + "я" * 3000 + "\n" for i in range(1, 30)) + "## 0.12.9 — d\n" + "".join(f"- пункт {i}\n" for i in range(50))
+        self.set_changelog(many)
+        (self.tmp / "remote-version").write_text("0.13.29\n")
+        notes = self.call("check_update")["notes"]
+        self.assertLessEqual(len(notes), 6)
+        self.assertTrue(all(len(i) <= 420 for n in notes for i in n["items"]))
+        self.set_changelog("## 0.12.9 — d\n" + "".join(f"- пункт {i}\n" for i in range(50)))
+        (self.tmp / "remote-version").write_text("0.12.9\n")
+        self.assertLessEqual(len(self.call("check_update")["notes"][0]["items"]), 12)
+
+    def serve_as_proxy(self, files):
+        """Маленький «прокси»: на любой запрос отвечает по пути. Прямое обращение к недоступному имени вне прокси не удастся."""
+        import threading
+        from http.server import BaseHTTPRequestHandler, HTTPServer
+
+        class H(BaseHTTPRequestHandler):
+            def log_message(self, *a):
+                pass
+
+            def do_GET(self):
+                path = "/" + self.path.split("://", 1)[-1].split("/", 1)[-1].split("?")[0]
+                body = files.get(path)
+                self.send_response(200 if body is not None else 404)
+                self.end_headers()
+                self.wfile.write((body or "").encode("utf-8"))
+        srv = HTTPServer(("127.0.0.1", 0), H)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        self.addCleanup(srv.server_close)
+        self.addCleanup(srv.shutdown)
+        return srv.server_address[1]
+
+    def test_check_update_goes_through_the_local_proxy_when_github_is_closed(self):
+        port = self.serve_as_proxy({"/VERSION": "0.12.5\n", "/CHANGELOG.md": "## 0.12.5 — 2026-11-20\n- Через прокси.\n"})
+        self.env.update(DNEVNIK_VERSION_URL="http://blocked.invalid/VERSION", DNEVNIK_CHANGELOG_URL="http://blocked.invalid/CHANGELOG.md",
+                        DNEVNIK_PROXY=f"127.0.0.1:{port}")
+        r = self.call("check_update")
+        self.assertTrue(r["ok"], r)
+        self.assertEqual(r["latest"], "0.12.5")
+        self.assertEqual(r["notes"][0]["items"], ["Через прокси."])
+
+    def test_check_update_without_a_proxy_reports_no_connection(self):
+        self.env.update(DNEVNIK_VERSION_URL="http://blocked.invalid/VERSION", DNEVNIK_PROXY="127.0.0.1:9")    # на этом порту никто не слушает
+        r = self.call("check_update")
+        self.assertFalse(r["ok"])
+        self.assertIn("GitHub", r["message"])
+
+    def test_progress_follows_the_installer_log(self):
+        self.write_update_log("--- 2026-11-14 21:55:13 обновление программы\n", pid=os.getpid())
+        p = self.call("status")["updateProgress"]
+        self.assertEqual(p["percent"], 3)
+        steps = [("==> Проверяю Python…\n", 8), ("==> Ставлю пакеты: python3-codecs\n", 20), ("==> Скачиваю Rombaldo/dnevnik-OpenWRT (main) с GitHub…\n", 35),
+                 ("==> Устанавливаю версию 0.21.3 (была: 0.21.2)…\n", 60), ("==> Включаю службу и расписание…\n", 72),
+                 ("==> Ставлю страницу «Службы → Дневник» в LuCI…\n", 82), ("==> Готово: версия 0.21.3.\n", 92), ("==> Проверяю, что всё работает…\n", 96)]
+        text = "--- x\n"
+        last = 3
+        for line, want in steps:
+            text += line
+            self.write_update_log(text, pid=os.getpid())
+            p = self.call("status")["updateProgress"]
+            self.assertEqual(p["percent"], want, line)
+            self.assertGreaterEqual(p["percent"], last)                                          # назад полоса не едет
+            self.assertTrue(p["text"])
+            last = p["percent"]
+
+    def test_progress_never_reaches_100_while_running_and_mentions_the_proxy(self):
+        self.write_update_log("--- x\n==> Проверяю Python…\n!!  Прямое подключение не получилось. На роутере работает прокси (127.0.0.1:7890): повторяю через него.\n==> Скачиваю x…\n", pid=os.getpid())
+        p = self.call("status")["updateProgress"]
+        self.assertLess(p["percent"], 100)
+        self.assertIn("через прокси", p["text"])
+
+    def test_progress_is_empty_when_no_update_is_running(self):
+        self.write_update_log("--- x\n==> Скачиваю…\n")                                       # процесса нет
+        self.assertEqual(self.call("status")["updateProgress"], {})
+        self.assertEqual(self.call("status")["updateResult"]["state"], "failed")
+
     def test_log_returns_the_tail(self):
         (self.run_dir / "dnevnik-sync.log").write_text("\n".join(f"строка {i}" for i in range(100)))
         text = self.call("log", {"which": "sync"})["text"]
@@ -525,6 +639,9 @@ window.ui = {
   hideModal: () => { const m = document.getElementById('modal'); if (m) m.remove(); },
   addNotification: () => {}
 };
+window.L = { url: (p) => '/cgi-bin/luci/' + p, resource: (p) => '/luci-static/resources/' + p };
+window.fetched = [];
+window.fetch = (u, o) => { window.fetched.push([u, o]); return Promise.resolve({}); };
 window.mount = async (code) => {
   const cls = new Function('view', 'rpc', 'ui', 'poll', 'E', code)(window.view, window.rpc, window.ui, window.poll, window.E);
   window.cls = cls;
@@ -562,6 +679,8 @@ class ViewTests(unittest.TestCase):
             window.answer = (m, a) => (m in window.extra ? window.extra[m] : m === 'status' ? window.mockStatus : m === 'log' ? {text: 'строка журнала'} : {ok: true, message: 'ок'}); }""",
                       [dict(STATUS, **(status or {})), answers])
         page.evaluate("code => window.mount(code)", self.code)
+        # настоящий переход и перезагрузку подменяем записью, иначе страница теста исчезла бы; интервалы короткие
+        page.evaluate("() => { const c = window.cls; c.goTo = (u) => { window.navigated = u; }; c.reloadPage = () => { window.reloaded = true; }; c.logoutMs = 40; c.fastMs = 40; }")
         return page
 
     def names(self, page):
@@ -642,9 +761,10 @@ class ViewTests(unittest.TestCase):
         self.assertIn("Обновляется программа", page.inner_text(".dn-pill"))
         page.evaluate("window.mockStatus = Object.assign({}, window.mockStatus, {updating: false, version: '0.12.1', updateResult: {state: 'ok', version: '0.12.1', age: 3}})")
         self.poll_all(page)
-        page.wait_for_selector("text=Обновление завершено: установлена версия 0.12.1.")
+        page.wait_for_function("window.navigated === '/cgi-bin/luci/admin/logout'")          # после установки страница сама выходит из LuCI
         self.assertFalse(page.is_visible("text=Обновить до"))
         self.assertNotIn("запущено", page.inner_text(".dn"))
+        self.assertIn("Выходим из системы", page.inner_text(".dn"))
         self.assertEqual(self.errors, [])
 
     def test_update_that_finishes_before_the_first_poll_is_still_reported(self):
@@ -652,7 +772,7 @@ class ViewTests(unittest.TestCase):
         page.click("text=Проверить новую версию"); page.wait_for_selector("text=Обновить до 0.12.1")
         page.evaluate("window.mockStatus = Object.assign({}, window.mockStatus, {updating: false, version: '0.12.1', updateResult: {state: 'ok', version: '0.12.1', age: 1}})")
         page.click("text=Обновить до 0.12.1"); page.click("#modal button.cbi-button-action")
-        page.wait_for_selector("text=Обновление завершено")
+        page.wait_for_function("window.navigated === '/cgi-bin/luci/admin/logout'")
 
     def test_failed_update_is_shown_with_the_reason_and_opens_the_update_log(self):
         page = self.open({"updating": True})
@@ -680,6 +800,109 @@ class ViewTests(unittest.TestCase):
         self.assertIsNone(page.query_selector(".dn img"))
         self.assertIsNone(page.evaluate("window.pwned"))
         self.assertIn("<img", page.inner_text(".dn"))
+
+    # --- полоса хода, «Что нового», выход после обновления ---
+    def test_progress_bar_shows_percent_and_stage_only_while_updating(self):
+        page = self.open({"updating": True, "updateProgress": {"percent": 35, "text": "Скачиваю новую версию с GitHub…"}})
+        self.assertEqual(page.evaluate("document.querySelector('.dn-fill').style.width"), "35%")
+        self.assertIn("35% · Скачиваю новую версию", page.inner_text(".dn"))
+        page = self.open()
+        self.assertFalse(page.is_visible(".dn-bar"))
+
+    def test_bar_moves_by_itself_while_the_update_runs(self):
+        page = self.open({"updating": True, "updateProgress": {"percent": 20, "text": "Ставлю нужные пакеты…"}})
+        page.evaluate("window.mockStatus = Object.assign({}, window.mockStatus, {updateProgress: {percent: 60, text: 'Раскладываю файлы…'}})")
+        page.wait_for_function("document.querySelector('.dn-fill').style.width === '60%'")             # сам, без ручного опроса
+        self.assertIn("Раскладываю файлы", page.inner_text(".dn"))
+
+    def test_bar_is_clamped_and_survives_garbage(self):
+        page = self.open({"updating": True, "updateProgress": {"percent": 500, "text": "x"}})
+        self.assertEqual(page.evaluate("document.querySelector('.dn-fill').style.width"), "99%")
+        page = self.open({"updating": True, "updateProgress": {}})
+        self.assertEqual(page.evaluate("document.querySelector('.dn-fill').style.width"), "3%")
+        self.assertEqual(self.errors, [])
+
+    def test_after_install_the_page_refreshes_its_files_and_signs_out(self):
+        page = self.open({"updating": True, "updateProgress": {"percent": 82, "text": "Обновляю страницу LuCI…"}})
+        page.evaluate("window.mockStatus = Object.assign({}, window.mockStatus, {updating: false, version: '0.12.1', updateResult: {state: 'ok', version: '0.12.1', age: 1}})")
+        page.wait_for_function("window.navigated === '/cgi-bin/luci/admin/logout'")
+        fetched = page.evaluate("window.fetched")
+        self.assertEqual(fetched[0][0], "/luci-static/resources/view/dnevnik/status.js")                  # свежие файлы страницы мимо кэша
+        self.assertEqual(fetched[0][1]["cache"], "reload")
+        self.assertEqual(page.evaluate("document.querySelector('.dn-fill').style.width"), "100%")
+        self.assertIn("войдите снова", page.inner_text(".dn"))
+        self.assertEqual(page.evaluate("window.navigated"), "/cgi-bin/luci/admin/logout")
+        self.assertIsNone(page.evaluate("window.reloaded"))
+
+    def test_sign_out_happens_once_not_on_every_poll(self):
+        page = self.open({"updating": True})
+        page.evaluate("window.mockStatus = Object.assign({}, window.mockStatus, {updating: false, updateResult: {state: 'ok', version: '0.12.1', age: 1}})")
+        page.wait_for_function("window.navigated")
+        page.evaluate("window.navigated = null")
+        self.poll_all(page); self.poll_all(page)
+        page.wait_for_timeout(300)
+        self.assertIsNone(page.evaluate("window.navigated"))
+
+    def test_without_luci_helpers_it_reloads_the_page_instead(self):
+        page = self.open({"updating": True})
+        page.evaluate("window.L = undefined")
+        page.evaluate("window.mockStatus = Object.assign({}, window.mockStatus, {updating: false, updateResult: {state: 'ok', version: '0.12.1', age: 1}})")
+        page.wait_for_function("window.reloaded === true")
+        self.assertIsNone(page.evaluate("window.navigated"))
+
+    def test_opening_the_page_after_an_update_does_not_sign_out_again(self):
+        """После выхода и нового входа страница видит недавний итог: показывает его, но второй раз не выходит."""
+        page = self.open({"updateResult": {"state": "ok", "version": "0.12.1", "age": 20}})
+        page.wait_for_timeout(300)
+        self.assertIn("Обновление завершено: установлена версия 0.12.1.", page.inner_text(".dn"))
+        self.assertIsNone(page.evaluate("window.navigated"))
+        self.assertIsNone(page.evaluate("window.reloaded"))
+
+    def test_failed_update_does_not_sign_out_and_hides_the_bar(self):
+        page = self.open({"updating": True, "updateProgress": {"percent": 35, "text": "Скачиваю…"}})
+        page.evaluate("window.mockStatus = Object.assign({}, window.mockStatus, {updating: false, updateResult: {state: 'failed', message: 'ОШИБКА: x', age: 1}})")
+        page.wait_for_selector(".dn-note.bad")
+        page.wait_for_timeout(300)
+        self.assertFalse(page.is_visible(".dn-bar"))
+        self.assertIsNone(page.evaluate("window.navigated"))
+
+    def test_news_from_the_new_version_are_listed_after_the_check(self):
+        notes = [{"version": "0.12.2", "date": "2026-11-15", "items": ["Первое изменение.", "Второе изменение."]},
+                 {"version": "0.12.1", "date": "2026-11-14", "items": ["Старое изменение."]}]
+        page = self.open(answers={"check_update": {"ok": True, "current": "0.12.0", "latest": "0.12.2", "newer": True, "notes": notes}})
+        self.assertFalse(page.is_visible(".dn-news"))
+        page.click("text=Проверить новую версию")
+        page.wait_for_selector(".dn-news")
+        text = page.inner_text(".dn-news")
+        for needle in ("Что нового", "Версия 0.12.2 · 2026-11-15", "Первое изменение.", "Второе изменение.", "Версия 0.12.1 · 2026-11-14", "Старое изменение."):
+            self.assertIn(needle, text)
+        self.assertEqual(page.eval_on_selector_all(".dn-news li", "e => e.length"), 3)
+
+    def test_no_news_block_when_up_to_date_empty_or_rechecking(self):
+        page = self.open(answers={"check_update": {"ok": True, "current": "0.12.0", "latest": "0.12.0", "newer": False, "notes": []}})
+        page.click("text=Проверить новую версию"); page.wait_for_selector("text=последняя версия")
+        self.assertFalse(page.is_visible(".dn-news"))
+        page = self.open(answers={"check_update": {"ok": True, "current": "0.12.0", "latest": "0.12.1", "newer": True, "notes": []}})
+        page.click("text=Проверить новую версию"); page.wait_for_selector("text=Обновить до 0.12.1")
+        self.assertFalse(page.is_visible(".dn-news"))                                        # список не пришёл: обновиться всё равно можно
+        page = self.open(answers={"check_update": {"ok": True, "current": "0.12.0", "latest": "0.12.1", "newer": True}})
+        page.click("text=Проверить новую версию"); page.wait_for_selector("text=Обновить до 0.12.1")   # старый плагин без поля notes
+        self.assertFalse(page.is_visible(".dn-news"))
+
+    def test_news_text_from_github_is_not_executed(self):
+        notes = [{"version": "0.12.1", "date": "<b>x</b>", "items": ['<img src=x onerror="window.pwned=1">']}]
+        page = self.open(answers={"check_update": {"ok": True, "current": "0.12.0", "latest": "0.12.1", "newer": True, "notes": notes}})
+        page.click("text=Проверить новую версию"); page.wait_for_selector(".dn-news")
+        self.assertIsNone(page.query_selector(".dn-news img"))
+        self.assertIsNone(page.query_selector(".dn-news b b"))
+        self.assertIsNone(page.evaluate("window.pwned"))
+        self.assertIn("<img", page.inner_text(".dn-news"))
+
+    def test_confirmation_tells_about_the_sign_out(self):
+        page = self.open(answers={"check_update": {"ok": True, "current": "0.12.0", "latest": "0.12.1", "newer": True}})
+        page.click("text=Проверить новую версию"); page.wait_for_selector("text=Обновить до 0.12.1")
+        page.click("text=Обновить до 0.12.1")
+        self.assertIn("выйдете из LuCI", page.inner_text("#modal"))
 
     def pform(self, page):
         return page.query_selector_all(".dn-pform input")

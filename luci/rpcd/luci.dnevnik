@@ -20,6 +20,8 @@ TMPD = os.environ.get("DNEVNIK_TMP", "/tmp")
 CRON = os.environ.get("DNEVNIK_CRON", "/etc/crontabs/root")
 REPO = "Rombaldo/dnevnik-OpenWRT"
 VERSION_URL = os.environ.get("DNEVNIK_VERSION_URL", f"https://raw.githubusercontent.com/{REPO}/main/VERSION")
+CHANGELOG_URL = os.environ.get("DNEVNIK_CHANGELOG_URL", f"https://raw.githubusercontent.com/{REPO}/main/CHANGELOG.md")
+PROXY_HP = os.environ.get("DNEVNIK_PROXY", "127.0.0.1:7890")      # локальный прокси роутера (SSClash/Clash), если провайдер закрыл GitHub
 DATA = os.path.join(HOME, "data")
 OUT = os.path.join(PRIV, "data.json")
 SYNC_LOG, UPDATE_LOG = os.path.join(TMPD, "dnevnik-sync.log"), os.path.join(TMPD, "dnevnik-update.log")
@@ -97,6 +99,34 @@ def update_result():
     return {"state": "failed", "age": age, "message": (errors[-1] if errors else "обновление оборвалось, не дойдя до конца")[:240]}
 
 
+# Этапы обновления по строкам журнала установщика (install.sh): метка, процент на полосе, подпись. Проценты приблизительные: по ним видно ход, а не время.
+STAGES = [
+    ("==> Проверяю Python", 8, "Проверяю Python и пакеты…"),
+    ("==> Ставлю пакеты", 20, "Ставлю нужные пакеты…"),
+    ("==> Беру архив", 35, "Беру архив с новой версией…"),
+    ("==> Скачиваю", 35, "Скачиваю новую версию с GitHub…"),
+    ("==> Устанавливаю версию", 60, "Раскладываю файлы…"),
+    ("==> Включаю службу", 72, "Перезапускаю службу дневника…"),
+    ("==> Ставлю страницу", 82, "Обновляю страницу LuCI…"),
+    ("==> Готово", 92, "Почти готово…"),
+    ("==> Проверяю, что всё работает", 96, "Проверяю, что всё работает…"),
+]
+
+
+def update_progress():
+    """Ход идущего обновления по журналу: {"percent": 0..99, "text": подпись}. Пусто, если обновление не идёт."""
+    if not alive(UPDATE_PID):
+        return {}
+    text = read_text(UPDATE_LOG)
+    percent, label = 3, "Запускаю обновление…"
+    for marker, p, t in STAGES:
+        if marker in text and p >= percent:
+            percent, label = p, t
+    if percent < 60 and "Прямое подключение не получилось" in text:
+        label = label.rstrip("…") + " (через прокси)…"
+    return {"percent": percent, "text": label}
+
+
 # ---------- расписание в cron ----------
 def read_schedule():
     """(каждые N минут, с какого часа, до какого часа не включая). Если строки нет или она необычная, то 20, 6, 23."""
@@ -167,7 +197,7 @@ def status(_):
         "updatedAt": page.get("updatedAt"), "days": len(page.get("days") or []),
         "needLogin": bool(st.get("needLogin")), "error": st.get("error"),
         "student": student.get("name") or "", "school": student.get("school") or "",
-        "syncing": alive(SYNC_LOCK), "updating": alive(UPDATE_PID), "updateResult": update_result(), "canRestore": can_restore,
+        "syncing": alive(SYNC_LOCK), "updating": alive(UPDATE_PID), "updateProgress": update_progress(), "updateResult": update_result(), "canRestore": can_restore,
         "every": every, "from": start, "to": end, "name": name,
         "nextIn": next_run_in(every, start, end), "now": int(time.time()),
         "url": f"http://dnevnik.{domain}", "urlIp": f"http://{ip}:8765" if ip else "",
@@ -200,11 +230,61 @@ def vtuple(v):
     return tuple(int(x) for x in v.split("."))
 
 
+def proxy_listening():
+    import socket
+    try:
+        host, port = PROXY_HP.rsplit(":", 1)
+        with socket.create_connection((host, int(port)), timeout=1):
+            return True
+    except (OSError, ValueError):
+        return False
+
+
+def http_get(url, limit, timeout=10):
+    """Скачивает небольшой текст. Если напрямую не вышло (оператор закрыл GitHub), а на роутере слушает прокси, повторяет через него: только для этого запроса."""
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as r:
+            return r.read(limit).decode("utf-8", "replace")
+    except Exception:
+        if not proxy_listening():
+            raise
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({"http": f"http://{PROXY_HP}", "https": f"http://{PROXY_HP}"}))
+    with opener.open(url, timeout=timeout) as r:
+        return r.read(limit).decode("utf-8", "replace")
+
+
+def plain(text):
+    """Разметка Markdown в простой текст: ссылки, жирный, код."""
+    text = re.sub(r"\*\*([^*]+)\*\*", r"\1", text)
+    text = re.sub(r"`([^`]+)`", r"\1", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def release_notes(changelog, cur, latest, max_versions=6, max_items=12, max_chars=420):
+    """Что нового в версиях после cur и до latest включительно: [{"version", "date", "items": [...]}], новые сверху (как в файле)."""
+    out, node = [], None
+    for line in changelog.splitlines():
+        m = re.match(r"^##\s+(\d+\.\d+\.\d+)\s*[—-]\s*(.*)$", line)
+        if m:
+            node = None
+            try:
+                inside = vtuple(cur) < vtuple(m.group(1)) <= vtuple(latest)
+            except ValueError:
+                inside = False
+            if inside and len(out) < max_versions:
+                node = {"version": m.group(1), "date": m.group(2).strip()[:20], "items": []}
+                out.append(node)
+        elif node is not None and line.startswith("- ") and len(node["items"]) < max_items:
+            item = plain(line[2:])
+            if item:
+                node["items"].append(item if len(item) <= max_chars else item[: max_chars - 1] + "…")
+    return out
+
+
 def check_update(_):
     cur = read_text(os.path.join(HOME, "VERSION")).strip()
     try:
-        with urllib.request.urlopen(VERSION_URL, timeout=10) as r:
-            latest = r.read(64).decode("utf-8", "replace").strip()
+        latest = http_get(VERSION_URL, 64).strip()
     except Exception:
         return {"ok": False, "current": cur, "message": "Не удалось связаться с GitHub. Проверьте интернет на роутере."}
     if not re.fullmatch(r"\d+\.\d+\.\d+", latest or ""):
@@ -213,7 +293,13 @@ def check_update(_):
         newer = vtuple(latest) > vtuple(cur)
     except ValueError:
         newer = latest != cur
-    return {"ok": True, "current": cur, "latest": latest, "newer": newer}
+    res = {"ok": True, "current": cur, "latest": latest, "newer": newer, "notes": []}
+    if newer:
+        try:
+            res["notes"] = release_notes(http_get(CHANGELOG_URL, 200000), cur, latest)
+        except Exception:
+            pass                                                                          # список изменений необязателен: обновиться можно и без него
+    return res
 
 
 def update(_):
