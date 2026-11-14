@@ -48,6 +48,43 @@ done
 say() { echo "==> $*"; }
 die() { echo "ОШИБКА: $*" >&2; rm -rf "$TMP"; exit 1; }
 
+# >>> netlib
+PROXY_HP="${DNEVNIK_PROXY:-127.0.0.1:7890}"
+NETLIB_SET_PROXY=0
+
+proxy_listening() { netstat -ltn 2>/dev/null | grep -q ":${PROXY_HP##*:} "; }
+proxy_in_env() { [ -n "${https_proxy}${HTTPS_PROXY}${http_proxy}${HTTP_PROXY}" ]; }
+use_proxy() {
+    https_proxy="http://$PROXY_HP"; http_proxy="http://$PROXY_HP"; HTTPS_PROXY="http://$PROXY_HP"; HTTP_PROXY="http://$PROXY_HP"
+    export https_proxy http_proxy HTTPS_PROXY HTTP_PROXY
+    NETLIB_SET_PROXY=1
+}
+# Убрать прокси, который подставили мы (чужой, заданный человеком, не трогаем): дальше скрипт ходит как обычно.
+drop_proxy() {
+    [ "$NETLIB_SET_PROXY" = "1" ] || return 0
+    unset https_proxy http_proxy HTTPS_PROXY HTTP_PROXY
+    NETLIB_SET_PROXY=0
+}
+# net_try КОМАНДА…: выполняет команду; если прямой доступ не вышел, а на роутере слушает прокси, повторяет через него.
+net_try() {
+    "$@" && return 0
+    if proxy_in_env || ! proxy_listening; then return 1; fi
+    echo "!!  Прямое подключение не получилось. На роутере работает прокси ($PROXY_HP): повторяю через него (только для этой установки, настройки роутера не меняются)."
+    use_proxy
+    "$@"
+}
+# Запрос к самому роутеру всегда напрямую: прокси из окружения для 127.0.0.1 не годится.
+local_get() { ( unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY all_proxy ALL_PROXY; wget -q -T 3 -O /dev/null "$1" 2>/dev/null ); }
+# Адрес роутера в домашней сети. Сначала то, что роутер реально получил (работает и когда адрес выдан по DHCP), потом настройка.
+lan_ip() {
+    ip=$(ubus call network.interface.lan status 2>/dev/null | jsonfilter -e '@["ipv4-address"][0].address' 2>/dev/null) || ip=""
+    [ -n "$ip" ] || ip=$(uci -q get network.lan.ipaddr 2>/dev/null | cut -d/ -f1) || ip=""
+    echo "$ip"
+}
+# name_resolves ИМЯ АДРЕС: DNS роутера отдаёт для имени именно этот адрес. Без известного адреса проверить нечего: ответ «нет».
+name_resolves() { [ -n "$2" ] && nslookup "$1" 127.0.0.1 2>/dev/null | grep -qwF "$2"; }
+# <<< netlib
+
 [ "$(id -u)" = "0" ] || die "запускайте от root"
 [ -f /etc/openwrt_release ] || die "это не OpenWrt"
 OLD=$(cat "$APP/VERSION" 2>/dev/null || echo "нет")
@@ -61,11 +98,11 @@ PKGS="python3-light python3-openssl python3-urllib python3-email python3-codecs"
 if command -v apk >/dev/null 2>&1; then
     MISSING=""
     for p in $PKGS; do apk info -e "$p" >/dev/null 2>&1 || MISSING="$MISSING $p"; done
-    if [ -n "$MISSING" ]; then say "Ставлю пакеты:$MISSING"; apk update >/dev/null 2>&1 || true; apk add $MISSING || die "не удалось поставить$MISSING"; fi
+    if [ -n "$MISSING" ]; then say "Ставлю пакеты:$MISSING"; net_try sh -c 'apk update >/dev/null 2>&1' || true; net_try apk add $MISSING || die "не удалось поставить$MISSING. Если связь с GitHub и репозиторием пакетов закрыта оператором (так бывает у мобильного интернета), а на роутере работает прокси (SSClash/Clash), запустите установку через него: https_proxy=http://127.0.0.1:7890 sh install.sh"; fi
 elif command -v opkg >/dev/null 2>&1; then
     MISSING=""
     for p in $PKGS; do opkg list-installed 2>/dev/null | grep -q "^$p " || MISSING="$MISSING $p"; done
-    if [ -n "$MISSING" ]; then say "Ставлю пакеты:$MISSING"; opkg update >/dev/null 2>&1 || true; opkg install $MISSING || die "не удалось поставить$MISSING"; fi
+    if [ -n "$MISSING" ]; then say "Ставлю пакеты:$MISSING"; net_try sh -c 'opkg update >/dev/null 2>&1' || true; net_try opkg install $MISSING || die "не удалось поставить$MISSING. Если связь с GitHub и репозиторием пакетов закрыта оператором (так бывает у мобильного интернета), а на роутере работает прокси (SSClash/Clash), запустите установку через него: https_proxy=http://127.0.0.1:7890 sh install.sh"; fi
 else
     die "не нашёл apk или opkg"
 fi
@@ -83,13 +120,15 @@ else
         # токен кладём во временный конфиг (доступ только у root), чтобы он не светился в списке процессов;
         # строгие права действуют только в скобках, на остальные файлы они не влияют
         ( umask 077; printf 'header = Authorization: Bearer %s\nheader = Accept: application/vnd.github+json\n' "$(cat "$TOKEN_FILE")" > "$TMP/wgetrc" )
-        WGETRC="$TMP/wgetrc" wget -q -T 30 -O "$TMP/src.tar.gz" "$URL" || die "не скачалось: проверьте токен, имя репозитория ($REPO) и версию ($REF)"
-        rm -f "$TMP/wgetrc"
+        WGETRC="$TMP/wgetrc"; export WGETRC
+        net_try wget -q -T 30 -O "$TMP/src.tar.gz" "$URL" || die "не скачалось: проверьте токен, имя репозитория ($REPO) и версию ($REF). Если связь с GitHub и репозиторием пакетов закрыта оператором (так бывает у мобильного интернета), а на роутере работает прокси (SSClash/Clash), запустите установку через него: https_proxy=http://127.0.0.1:7890 sh install.sh"
+        unset WGETRC; rm -f "$TMP/wgetrc"
     else
         say "Скачиваю $REPO ($REF) с GitHub…"
-        wget -q -T 30 -O "$TMP/src.tar.gz" "$URL" || die "не скачалось ($REPO, $REF). Если репозиторий приватный, нужен токен в $TOKEN_FILE; если публичный, проверьте интернет на роутере"
+        net_try wget -q -T 30 -O "$TMP/src.tar.gz" "$URL" || die "не скачалось ($REPO, $REF). Если репозиторий приватный, нужен токен в $TOKEN_FILE; если публичный, проверьте интернет на роутере Если связь с GitHub и репозиторием пакетов закрыта оператором (так бывает у мобильного интернета), а на роутере работает прокси (SSClash/Clash), запустите установку через него: https_proxy=http://127.0.0.1:7890 sh install.sh"
     fi
 fi
+drop_proxy   # прокси нужен только для загрузки; дальше (служба, проверка) всё идёт как обычно
 [ "$(wc -c < "$TMP/src.tar.gz")" -gt 2000 ] || die "архив подозрительно маленький"
 tar tzf "$TMP/src.tar.gz" >/dev/null 2>&1 || die "архив повреждён"
 mkdir -p "$TMP/x" && tar xzf "$TMP/src.tar.gz" -C "$TMP/x"
@@ -140,16 +179,16 @@ fi
 # 5. Проверяю, что страница действительно открывается
 OK=0
 for i in 1 2 3 4 5 6 7 8 9 10; do
-    if wget -q -T 3 -O /dev/null http://127.0.0.1:8765/index.html 2>/dev/null; then OK=1; break; fi
+    if local_get http://127.0.0.1:8765/index.html; then OK=1; break; fi
     sleep 2
 done
 [ "$OK" = "1" ] || die "версия установлена, но страница на порту 8765 не отвечает: смотрите logread | tail"
 
 DOMAIN=$(uci -q get dhcp.@dnsmasq[0].domain); DOMAIN="${DOMAIN:-lan}"
-LANIP=$(uci -q get network.lan.ipaddr | cut -d/ -f1)
+LANIP=$(lan_ip)
 NAME_OK=0
 for i in 1 2 3 4 5; do
-    nslookup "dnevnik.$DOMAIN" 127.0.0.1 2>/dev/null | grep -q "$LANIP" && { NAME_OK=1; break; }
+    name_resolves "dnevnik.$DOMAIN" "$LANIP" && { NAME_OK=1; break; }
     sleep 1
 done
 
@@ -165,8 +204,10 @@ if [ ! -s "$APP/data/credentials.json" ] && [ ! -s "$APP/data/session.json" ]; t
 fi
 if [ "$NAME_OK" = "1" ]; then
     echo "    Страница: http://dnevnik.$DOMAIN   (запасной адрес: http://$LANIP:8765)"
-else
+elif [ -n "$LANIP" ]; then
     echo "    Страница: http://$LANIP:8765   (имя dnevnik.$DOMAIN пока не заработало: выключите на телефоне «Частный DNS»/«Защищённый DNS» или пользуйтесь адресом с цифрами)"
+else
+    echo "    Страница: откройте адрес роутера с портом 8765, например http://АДРЕС-РОУТЕРА:8765 (адрес роутера виден в LuCI: «Сеть → Интерфейсы»; определить его самостоятельно не удалось, поэтому имя dnevnik.$DOMAIN не проверено)"
 fi
 
 # 6. Проверка, что всё работает (только показывает замечания; ничего не меняет)

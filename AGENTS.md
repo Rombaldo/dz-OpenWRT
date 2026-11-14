@@ -58,6 +58,7 @@ wget -qO- https://raw.githubusercontent.com/Rombaldo/dnevnik-OpenWRT/main/router
 ```
 Ключ `--luci` ставит страницу «Службы → Дневник» (рекомендуется; без него `--no-luci`). Установщик сам доставит Python и нужные пакеты, включит службу и расписание и в конце сам запустит проверку.
 Если команда не скачивается: проверь интернет на роутере (`wget -qO- https://dnevnik.ru | head -c 50`). Если роутер без доступа к GitHub, архив можно передать по SSH (`SRC_TARBALL=/tmp/архив.tar.gz sh install.sh`).
+**Команда молчит (`wget -q` не показывает ошибок) или «Connection refused»:** часто это мобильный интернет со «списком разрешённых сайтов» (dnevnik.ru открывается, GitHub нет). Проверь без `-q`: `wget -O /dev/null https://raw.githubusercontent.com/Rombaldo/dnevnik-OpenWRT/main/VERSION`. Если на роутере есть прокси (SSClash/Clash, порт `7890`: `netstat -ltn | grep 7890`), запусти установку так: `https_proxy=http://127.0.0.1:7890 wget -qO- https://raw.githubusercontent.com/Rombaldo/dnevnik-OpenWRT/main/router/install.sh | sh -s -- --luci`. Дальше `install.sh`, `remote.sh` и `push.sh` сами повторят загрузку и установку пакетов через этот прокси, если прямой доступ не вышел; настройки роутера они не меняют (прокси только в окружении команды). Скажи человеку, что ты это делаешь, и не добавляй прокси в настройки системы.
 Результат: дневник открывается дома по `http://dnevnik.lan` (запасной адрес с цифрами установщик печатает).
 
 ### Шаг 3. Вход в Дневник.ру (делает человек)
@@ -103,6 +104,7 @@ sh /root/dnevnik/router/remote.sh
 
 | Симптом | Что делать |
 |---|---|
+| Установка молчит или «Connection refused» | GitHub закрыт оператором: см. шаг 2, установка через прокси `https_proxy=http://127.0.0.1:7890` |
 | Не хватает места | `df -h /overlay`; освободить место или не ставить Tailscale (дневник дома работает без него) |
 | `dnevnik.lan` не открывается | открыть по адресу с цифрами `http://АДРЕС:8765`; на телефоне выключить «Частный DNS»; `sh /root/dnevnik/router/setname.sh` |
 | «Нужно войти в Дневник.ру заново» | повторить шаг 3 |

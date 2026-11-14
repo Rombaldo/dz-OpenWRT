@@ -41,6 +41,10 @@ warn() { echo "!!  $*"; }
 die()  { echo "ОШИБКА: $*" >&2; exit 1; }
 mark() { [ -n "$MACHINE" ] && echo "@@$*"; return 0; }
 
+# Общие сетевые помощники (повтор через прокси, если провайдер закрыл репозиторий пакетов); без файла работаем как раньше
+NETLIB="$(dirname "$0")/netlib.sh"
+if [ -f "$NETLIB" ]; then . "$NETLIB"; else net_try() { "$@"; }; drop_proxy() { :; }; fi
+
 ts_installed() { command -v tailscale >/dev/null 2>&1; }
 backend_state() { tailscale status --json 2>/dev/null | sed -n 's/.*"BackendState": *"\([A-Za-z]*\)".*/\1/p' | head -n 1; }
 listening() { netstat -ltn 2>/dev/null | grep -q ":$1 "; }
@@ -121,12 +125,13 @@ install_tailscale() {
     fi
     say "Ставлю пакет tailscale…"
     if command -v apk >/dev/null 2>&1; then
-        apk update >/dev/null 2>&1 || true
-        apk add tailscale || die "не удалось поставить пакет tailscale"
+        net_try sh -c 'apk update >/dev/null 2>&1' || true
+        net_try apk add tailscale || die "не удалось поставить пакет tailscale. Если репозиторий пакетов закрыт оператором, а на роутере работает прокси (SSClash/Clash), запустите так: https_proxy=http://127.0.0.1:7890 sh $0"
     else
-        opkg update >/dev/null 2>&1 || true
-        opkg install tailscale || die "не удалось поставить пакет tailscale"
+        net_try sh -c 'opkg update >/dev/null 2>&1' || true
+        net_try opkg install tailscale || die "не удалось поставить пакет tailscale. Если репозиторий пакетов закрыт оператором, а на роутере работает прокси (SSClash/Clash), запустите так: https_proxy=http://127.0.0.1:7890 sh $0"
     fi
+    drop_proxy   # прокси нужен только для загрузки пакета
     ts_installed || die "после установки команда tailscale не найдена"
 }
 

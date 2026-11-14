@@ -70,11 +70,12 @@ def run(cmd, timeout=8):
         return None
 
 
-def http(url, timeout=8, method="GET"):
-    """(код, тело) или (None, текст ошибки). Ответы 4xx и 5xx возвращаются как есть."""
+def http(url, timeout=8, method="GET", direct=False):
+    """(код, тело) или (None, текст ошибки). Ответы 4xx и 5xx возвращаются как есть. direct=True: мимо прокси из окружения (для самого роутера)."""
     try:
         req = urllib.request.Request(url, method=method, headers={"User-Agent": "dnevnik-doctor"})
-        with urllib.request.urlopen(req, timeout=timeout) as r:
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({})) if direct else urllib.request.build_opener()
+        with opener.open(req, timeout=timeout) as r:
             return r.status, r.read(4096).decode("utf-8", "replace")
     except urllib.error.HTTPError as e:
         return e.code, ""
@@ -156,23 +157,37 @@ def check_space(tailscale_installed):
 
 def check_web():
     out = []
-    code, _ = http(f"http://127.0.0.1:{PORT}/index.html", 5)
+    code, _ = http(f"http://127.0.0.1:{PORT}/index.html", 5, direct=True)
     if code == 200:
         out.append(R("web", OK, "Страница дневника на роутере", f"отвечает на порту {PORT}"))
     else:
         return [R("web", FAIL, "Страница дневника на роутере", f"не отвечает на порту {PORT}",
                   "запустите: /etc/init.d/dnevnik restart, затем повторите проверку")]
-    code, _ = http(f"http://127.0.0.1:{PORT}/cgi-bin/data", 5)
+    code, _ = http(f"http://127.0.0.1:{PORT}/cgi-bin/data", 5, direct=True)
     if code in (200, 401):
         out.append(R("data", OK, "Выдача данных (cgi-bin/data)", "работает" if code == 200 else "работает, закрыта паролем"))
     else:
         out.append(R("data", FAIL, "Выдача данных (cgi-bin/data)", f"ответ {code}", "переустановите программу: sh /root/dnevnik/router/install.sh"))
     for leak in ("data.json", "offline.html"):                                 # данные не должны лежать в открытой папке
-        code, _ = http(f"http://127.0.0.1:{PORT}/{leak}", 5)
+        code, _ = http(f"http://127.0.0.1:{PORT}/{leak}", 5, direct=True)
         if code == 200:
             out.append(R("leak", FAIL, "Данные в открытой папке", f"{leak} отдаётся без пароля",
                          "обновите программу: sh /root/dnevnik/router/install.sh"))
     return out
+
+
+def lan_ip():
+    """Адрес роутера в домашней сети: сначала тот, что роутер получил на деле (годится и когда адрес выдан по DHCP), потом из настроек."""
+    r = run(["ubus", "call", "network.interface.lan", "status"])
+    if r and r.stdout.strip():
+        try:
+            ip = (json.loads(r.stdout).get("ipv4-address") or [{}])[0].get("address") or ""
+        except (ValueError, AttributeError, IndexError, TypeError):
+            ip = ""
+        if ip:
+            return ip
+    r = run(["uci", "-q", "get", "network.lan.ipaddr"])
+    return r.stdout.strip().split("/")[0] if r and r.stdout.strip() else ""
 
 
 def check_name():
@@ -180,10 +195,7 @@ def check_name():
     r = run(["uci", "-q", "get", "dhcp.@dnsmasq[0].domain"])
     if r and r.stdout.strip():
         domain = r.stdout.strip()
-    ip = ""
-    r = run(["uci", "-q", "get", "network.lan.ipaddr"])
-    if r:
-        ip = r.stdout.strip().split("/")[0]
+    ip = lan_ip()
     try:
         got = socket.gethostbyname(f"dnevnik.{domain}")
     except OSError:

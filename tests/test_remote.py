@@ -627,3 +627,138 @@ class PushShTests(RemoteBase):
         code, out = self.run_push()
         self.assertEqual(code, 1)
         self.assertIn("дневник не установлен", out)
+
+
+# apk, у которого прямой доступ закрыт оператором (как на роутере с модемом и «белым списком»): работает только через прокси из окружения
+FAKE_APK_BLOCKED = r"""#!/bin/sh
+echo "apk $* proxy=${https_proxy:-none}" >> "$FAKE/calls"
+[ -n "$https_proxy" ] || { echo "ERROR: unable to select packages: Connection refused" >&2; exit 1; }
+[ "$1" = add ] && [ "$2" = tailscale ] && cp "$FAKE/tailscale-stub" "$BIN/tailscale" && chmod 755 "$BIN/tailscale"
+[ "$1" = add ] && [ "$2" = python3-cryptography ] && touch "$FAKE/have_crypto"
+exit 0
+"""
+FAKE_SERVICE_ENV = r"""#!/bin/sh
+echo "service $* env=${https_proxy:-none}" >> "$FAKE/calls"
+case "$1" in
+  start|restart) [ -f "$FAKE/state" ] && [ "$(cat "$FAKE/state")" = Running ] || echo NeedsLogin > "$FAKE/state" ;;
+esac
+"""
+HINT = "https_proxy=http://127.0.0.1:7890"
+
+
+class BlockedRepositoryTests(RemoteBase):
+    """Оператор закрыл репозиторий пакетов, на роутере работает прокси: установка не должна молча падать."""
+
+    def setUp(self):
+        super().setUp()
+        put(self.bin / "apk", FAKE_APK_BLOCKED)
+
+    def test_remote_installs_tailscale_through_the_local_proxy_and_says_so(self):
+        self.have_tailscale(False)
+        self.set("proxy_listen", "1")
+        put(self.tmp / "service", FAKE_SERVICE_ENV)
+        code, out = self.run_remote(machine=True)
+        self.assertIn("Прямое подключение не получилось", out)
+        self.assertIn("настройки роутера не меняются", out)
+        self.assertTrue((self.bin / "tailscale").exists(), out)                          # пакет всё-таки поставился
+        calls = self.calls()
+        self.assertEqual(calls[:3], ["apk update proxy=none", "apk update proxy=http://127.0.0.1:7890",      # сначала напрямую, не вышло, потом через прокси
+                                     "apk add tailscale proxy=http://127.0.0.1:7890"])                    # и установка уже идёт через него
+
+    def test_the_proxy_is_not_left_in_the_environment_after_the_download(self):
+        self.have_tailscale(False)
+        self.set("proxy_listen", "1")
+        put(self.tmp / "service", FAKE_SERVICE_ENV)
+        self.run_remote(machine=True)
+        services = [c for c in self.calls() if c.startswith("service ")]
+        self.assertTrue(services)
+        self.assertTrue(all(c.endswith("env=none") for c in services), services)         # служба Tailscale запускается без нашего прокси
+
+    def test_without_any_proxy_the_failure_is_explained_with_the_way_out(self):
+        self.have_tailscale(False)
+        code, out = self.run_remote()
+        self.assertEqual(code, 1, out)
+        self.assertIn("не удалось поставить пакет tailscale", out)
+        self.assertIn(HINT, out)
+        self.assertEqual([c for c in self.calls() if c.startswith("apk add")], ["apk add tailscale proxy=none"])    # одна попытка, без самодеятельности
+
+    def test_user_given_proxy_is_used_as_is(self):
+        self.have_tailscale(False)
+        self.set("proxy_listen", "1")
+        code, out = self.run_remote(https_proxy="http://10.0.0.5:3128")
+        self.assertIn("apk add tailscale proxy=http://10.0.0.5:3128", self.calls())
+        self.assertNotIn("Прямое подключение", out)
+
+    def test_works_without_the_library_file_like_before(self):
+        """Обновление могло не донести netlib.sh: скрипт должен работать как раньше, а не падать на «command not found»."""
+        isolated = self.tmp / "isolated"
+        isolated.mkdir()
+        shutil.copy(REMOTE, isolated / "remote.sh")
+        e = {"PATH": f"{self.bin}:{os.environ['PATH']}", "FAKE": str(self.fake), "BIN": str(self.bin), "DNEVNIK_HOME": str(self.home),
+             "DNEVNIK_TS_INIT": str(self.init), "DNEVNIK_TS_SVC": str(self.tmp / "service"), "DNEVNIK_ALLOW_NONROOT": "1", "DNEVNIK_TMP": str(self.tmp),
+             "DNEVNIK_LOGIN_WAIT": "6", "DNEVNIK_STEP": "1", "DNEVNIK_PORT": "8765", "DNEVNIK_FREE_KB": "30000", "HOME": str(self.tmp)}
+        put(self.bin / "apk", FAKE_APK)                                                  # обычный подставной apk
+        self.have_tailscale(False)
+        r = subprocess.run(["sh", str(isolated / "remote.sh")], capture_output=True, text=True, env=e, timeout=90)
+        self.assertNotIn("not found", r.stdout + r.stderr)
+        self.assertTrue((self.bin / "tailscale").exists(), r.stdout + r.stderr)
+
+
+class PushBlockedRepositoryTests(PushShTests):
+    def setUp(self):
+        super().setUp()
+        put(self.bin / "apk", FAKE_APK_BLOCKED)
+
+    # унаследованные тесты уже проверены выше; здесь только свои
+    def test_installs_through_the_local_proxy_when_the_repository_is_closed(self):
+        self.set("proxy_listen", "1")
+        code, out = self.run_push()
+        self.assertEqual(code, 0, out)
+        self.assertIn("Прямое подключение не получилось", out)
+        self.assertIn("apk add python3-cryptography proxy=http://127.0.0.1:7890", self.calls())
+
+    def test_failure_without_a_proxy_says_what_to_do(self):
+        code, out = self.run_push()
+        self.assertEqual(code, 1, out)
+        self.assertIn("не удалось поставить python3-cryptography", out)
+        self.assertIn(HINT, out)
+
+    # чтобы не гонять заново унаследованные: пустые заглушки
+    test_syntax = test_installs_the_module_and_prepares_keys = test_install_that_does_not_help_fails_with_a_message = None
+    test_module_already_there_changes_nothing_and_prepares_keys = test_not_enough_space_is_a_clear_message = None
+    test_status_and_unknown_command = test_requires_installed_program = None
+
+
+class DoctorNetworkTests(DoctorTests):
+    """Помощник не должен путаться из-за прокси в окружении и из-за адреса, выданного по DHCP."""
+
+    def test_checks_of_the_router_itself_ignore_proxy_variables(self):
+        port = self.good_port()
+        dead = "http://127.0.0.1:9"                                                      # прокси, который не отвечает
+        code, out = self.doctor(port=port, http_proxy=dead, https_proxy=dead, HTTP_PROXY=dead, HTTPS_PROXY=dead)
+        self.assertIn("✓ Страница дневника на роутере", out)
+        self.assertIn("✓ Выдача данных", out)
+        self.assertNotIn("✗ Страница дневника", out)
+
+    def test_router_address_from_dhcp_is_used_in_the_hint(self):
+        put(self.bin / "ubus", '#!/bin/sh\necho \'{"up": true, "ipv4-address": [{"address": "192.168.50.20", "mask": 24}]}\'\n')
+        put(self.bin / "uci", "#!/bin/sh\nexit 1\n")                                       # в настройках адреса нет: интерфейс получает его по DHCP
+        code, out = self.doctor(port=self.good_port(), DNEVNIK_DOMAIN="invalid")          # имя .invalid не разрешается никогда
+        self.assertIn("http://192.168.50.20:", out)
+        self.assertNotIn("адрес-роутера", out)
+
+    def test_hint_without_any_known_address_is_still_readable(self):
+        put(self.bin / "uci", "#!/bin/sh\nexit 1\n")
+        code, out = self.doctor(port=self.good_port(), DNEVNIK_DOMAIN="invalid")
+        self.assertIn("адрес-роутера", out)
+
+    def test_garbage_from_ubus_does_not_break_the_report(self):
+        put(self.bin / "ubus", "#!/bin/sh\necho 'not json at all'\n")
+        put(self.bin / "uci", "#!/bin/sh\nexit 1\n")
+        code, out = self.doctor(port=self.good_port(), DNEVNIK_DOMAIN="invalid")
+        self.assertIn("ИТОГ", out)
+
+    # унаследованные проверки DoctorTests не повторяем
+    for _n in [n for n in dir(DoctorTests) if n.startswith("test_")]:
+        locals()[_n] = None
+    del _n

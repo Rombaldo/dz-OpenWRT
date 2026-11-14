@@ -923,6 +923,7 @@ class UiSmokeTests(unittest.TestCase):
         self.assertNotEqual(page.evaluate("getComputedStyle(document.querySelector('.cal-cell.ill')).backgroundColor"), ok_bg)   # дни с пропусками по-прежнему другого цвета
         self.assertEqual(errors, [])
 
+    @unittest.skipIf(date.today().weekday() > 4, "сегодня выходной: в демо-данных нет уроков")
     def test_today_in_the_day_pager_is_blue_like_in_the_feed(self):
         page, errors = self.open_ctx()
         feed = page.evaluate("getComputedStyle(document.querySelector('.dtitle .rel')).color")

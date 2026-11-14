@@ -15,6 +15,10 @@ MIN_FREE_KB="${DNEVNIK_MIN_FREE_KB:-8000}"        # пакет с зависим
 
 say()  { echo "==> $*"; }
 die()  { echo "ОШИБКА: $*" >&2; exit 1; }
+
+# Общие сетевые помощники (повтор через прокси, если провайдер закрыл репозиторий пакетов); без файла работаем как раньше
+NETLIB="$(dirname "$0")/netlib.sh"
+if [ -f "$NETLIB" ]; then . "$NETLIB"; else net_try() { "$@"; }; drop_proxy() { :; }; fi
 have() { "$PY" -c 'import cryptography' >/dev/null 2>&1; }
 free_kb() { p=/overlay; [ -d "$p" ] || p=/; df -k "$p" 2>/dev/null | tail -n 1 | awk '{print $(NF-2)}'; }
 
@@ -39,14 +43,15 @@ install_module() {
     fi
     say "Ставлю python3-cryptography…"
     if command -v apk >/dev/null 2>&1; then
-        apk update >/dev/null 2>&1 || true
-        apk add python3-cryptography || die "не удалось поставить python3-cryptography"
+        net_try sh -c 'apk update >/dev/null 2>&1' || true
+        net_try apk add python3-cryptography || die "не удалось поставить python3-cryptography. Если репозиторий пакетов закрыт оператором, а на роутере работает прокси (SSClash/Clash), запустите так: https_proxy=http://127.0.0.1:7890 sh $0"
     elif command -v opkg >/dev/null 2>&1; then
-        opkg update >/dev/null 2>&1 || true
-        opkg install python3-cryptography || die "не удалось поставить python3-cryptography"
+        net_try sh -c 'opkg update >/dev/null 2>&1' || true
+        net_try opkg install python3-cryptography || die "не удалось поставить python3-cryptography. Если репозиторий пакетов закрыт оператором, а на роутере работает прокси (SSClash/Clash), запустите так: https_proxy=http://127.0.0.1:7890 sh $0"
     else
         die "не нашёл apk или opkg (это не OpenWrt?)"
     fi
+    drop_proxy
     have || die "модуль поставился, но Python его не видит"
 }
 
