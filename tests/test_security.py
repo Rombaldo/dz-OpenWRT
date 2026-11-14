@@ -158,6 +158,56 @@ class SecretScannerTests(unittest.TestCase):
         self.assertEqual(self.scan("tree")[0], 1)
         self.assertEqual(self.scan("history")[0], 1)
 
+    # --- адреса сети Tailscale: значения собираем частями, чтобы сам тест не выглядел как утечка ---
+    def test_real_tailscale_address_is_caught_but_invented_examples_pass(self):
+        real4 = "100." + "90.12.34"
+        self.add("a.py", f'addr = "{real4}"\n')
+        code, out = self.scan()
+        self.assertEqual(code, 1)
+        self.assertIn("адреса сети", out)
+        self.git("reset", "-q")
+        for ok in ("100.64.0.7", "100.63.1.1", "100.128.1.1", "1100.90.1.1", "8.8.8.8", "192.168.1.50", "100.64.0"):        # выдуманные, вне диапазона и обычные
+            with self.subTest(ok=ok):
+                self.git("reset", "-q")
+                self.add("b.py", f'x = "{ok}"\n')
+                self.assertEqual(self.scan()[0], 0, ok)
+
+    def test_real_tailscale_ipv6_and_tailnet_name_are_caught(self):
+        for bad in ("fd7a:115c:a1e0:" + "ab12:4843:cd96:6255:d3b", "my." + "tail" + "1a2b3c" + ".ts.net", "TAIL" + "1A2B3C.TS.NET"):
+            with self.subTest(bad=bad):
+                self.git("reset", "-q")
+                self.add("a.md", f"адрес {bad}\n")
+                self.assertEqual(self.scan()[0], 1, bad)
+        for ok in ("fd7a:115c:a1e0::1", "dnevnik.example.ts.net", "https://dnevnik.<ваша-сеть>.ts.net"):
+            with self.subTest(ok=ok):
+                self.git("reset", "-q")
+                self.add("b.md", f"адрес {ok}\n")
+                self.assertEqual(self.scan()[0], 0, ok)
+
+    def test_old_findings_are_exempt_in_history_only_by_exact_line_fingerprint(self):
+        line = 'addr = "' + "100." + '90.12.34"'
+        self.add("a.py", line + "\n")
+        self.git("commit", "-q", "-m", "old")
+        self.assertEqual(self.scan("history")[0], 1)                                     # новая находка в истории ловится
+        self.assertEqual(self.scan("tree")[0], 1)                                        # и в файлах
+        import hashlib
+        fp = hashlib.sha256(f"a.py: {line}".encode("utf-8")).hexdigest()[:16]
+        script = self.repo / "scripts" / "check_secrets.py"
+        script.write_text(script.read_text(encoding="utf-8").replace("KNOWN_OLD = {", "KNOWN_OLD = {" + repr(fp) + ", ", 1), encoding="utf-8")
+        self.assertEqual(self.scan("history")[0], 0)                                     # учтённая старая строка истории не мешает
+        self.assertEqual(self.scan("tree")[0], 1)                                        # но пока она есть в файлах, это стоп
+        self.add("c.py", 'other = "' + "100." + '90.12.35"\n')                          # другая строка отпечатку не соответствует
+        self.git("commit", "-q", "-m", "new")
+        self.assertEqual(self.scan("history")[0], 1)
+
+    def test_known_old_fingerprints_do_not_contain_values_and_match_nothing_current(self):
+        src = (ROOT / "scripts" / "check_secrets.py").read_text(encoding="utf-8")
+        import re as _re
+        m = _re.search(r"KNOWN_OLD = \{([^}]*)\}", src)
+        self.assertTrue(m)
+        for fp in _re.findall(r'"([^"]+)"', m.group(1)):
+            self.assertRegex(fp, r"^[0-9a-f]{16}$")                                      # только отпечатки, а не сами строки
+
     def test_project_itself_is_clean(self):
         for mode in ("tree", "history"):
             r = subprocess.run(["bash", "scripts/check-secrets.sh", mode], cwd=ROOT, capture_output=True, text=True)

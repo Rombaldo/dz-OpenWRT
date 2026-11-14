@@ -24,7 +24,7 @@ UA_TABLET = "Mozilla/5.0 (Linux; Android 14; SM-X710) AppleWebKit/537.36 (KHTML,
 PASSWORD = "семейный-пароль"
 
 
-def run(script, home, body=None, method="POST", cookie=None, ua=UA_IPHONE, addr="192.168.10.147", host=None, seen=None):
+def run(script, home, body=None, method="POST", cookie=None, ua=UA_IPHONE, addr="192.168.1.47", host=None, seen=None):
     data = b"" if body is None else json.dumps(body, ensure_ascii=False).encode()
     env = {"PATH": os.environ["PATH"], "REQUEST_METHOD": method, "CONTENT_LENGTH": str(len(data)), "DNEVNIK_HOME": str(home), "PYTHONPATH": str(ROOT),
            "DNEVNIK_AUTH_THROTTLE": str(Path(home) / "throttle"), "DNEVNIK_OUT": str(Path(home) / "page.json"), "DNEVNIK_SEEN": str(seen or Path(home) / "seen.json")}
@@ -66,7 +66,7 @@ class CgiBase(unittest.TestCase):
 
 class LoginLogCgiTests(CgiBase):
     def test_failed_and_successful_logins_are_recorded_with_device_and_place(self):
-        code, _, head, _ = self.login("неверный-пароль", ua=UA_TABLET, addr="192.168.10.50")
+        code, _, head, _ = self.login("неверный-пароль", ua=UA_TABLET, addr="192.168.1.50")
         self.assertEqual(code, 401)
         e = self.log()[0]
         self.assertEqual((e["ok"], e["dev"], e["where"]), (False, "Android (SM-X710) · Chrome", "home"))
@@ -114,7 +114,7 @@ class LoginLogCgiTests(CgiBase):
         self.assertEqual(self.log(), [])
 
     def test_tailscale_and_unknown_places(self):
-        self.login(addr="100.109.6.85")
+        self.login(addr="100.64.0.7")
         self.assertEqual(self.log()[0]["where"], "tailscale")
         self.login(addr=None)
         self.assertEqual(self.log()[0]["where"], "unknown")
@@ -141,7 +141,7 @@ class LastSeenCgiTests(CgiBase):
         return "dnevnik_auth=" + auth.make_token(self.data)
 
     def test_open_page_with_password_marks_the_device_and_gives_it_a_label_once(self):
-        code, body, head, _ = run("data.cgi", self.home, method="GET", cookie=self.token(), ua=UA_TABLET, addr="192.168.10.50")
+        code, body, head, _ = run("data.cgi", self.home, method="GET", cookie=self.token(), ua=UA_TABLET, addr="192.168.1.50")
         self.assertEqual(code, 200)
         dev = [c for c in cookies(head) if c.startswith("dnevnik_dev=")]
         self.assertEqual(len(dev), 1)

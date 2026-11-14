@@ -176,8 +176,8 @@ class PluginTests(PluginCase):
         push.save(data, {"subs": {"abc": {"endpoint": "https://web.push.apple.com/secret-token", "p256dh": "x", "auth": "y", "name": "Телефон Ани", "label": "iPhone · Safari",
                                           "created": 1_800_000_000, "prefs": {"types": {"mark": True, "homework": False}, "quiet": {"on": True}}, "pending": [{"id": 1}], "fail": 2}}})
         devices.record_login(data, False, "curl", "127.0.0.1", "a" * 12)
-        devices.record_login(data, True, "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) Version/18 Mobile/15E Safari/604", "192.168.10.5", "b" * 12)
-        devices.touch(self.run_dir / "seen.json", "b" * 12, "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) Version/18 Mobile/15E Safari/604", "192.168.10.5")
+        devices.record_login(data, True, "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) Version/18 Mobile/15E Safari/604", "192.168.1.5", "b" * 12)
+        devices.touch(self.run_dir / "seen.json", "b" * 12, "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) Version/18 Mobile/15E Safari/604", "192.168.1.5")
         r = self.call("devices_list")
         self.assertTrue(r["ok"])
         self.assertTrue(r["family"])

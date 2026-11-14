@@ -6,6 +6,7 @@
     check-secrets.sh tree      - все файлы проекта, которые отслеживает git
     check-secrets.sh history   - ВСЯ история git (запустить перед отправкой на GitHub)
 """
+import hashlib
 import re
 import subprocess
 import sys
@@ -23,6 +24,24 @@ STRONG = re.compile(r"BEGIN [A-Z ]*PRIVATE KEY|gh[pousr]_[A-Za-z0-9]{20,}|github
 WEAK = re.compile(r"""(DnevnikAuth_[a-z]|dnevnik_sst|a_r_p_i)["']? *[:=] *["']?[A-Za-z0-9%._-]{16,}|"""
                   r"""personId["']? *[:=] *["']?[0-9]{10,}""")
 SELF = ("scripts/check-secrets.sh", "scripts/check_secrets.py")
+
+# Настоящие адреса сети Tailscale выдают вашу сеть: адрес узла 100.64.0.0/10, IPv6 узла (fd7a:115c:a1e0:…) и имя сети вида tailXXXXXX.ts.net.
+# В примерах и тестах допустимы только выдуманные: 100.64.0.x и общий для всех префикс fd7a:115c:a1e0:: (двоеточия подряд).
+CGNAT4 = re.compile(r"(?<![\d.])100\.(?:6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.\d{1,3}\.\d{1,3}(?!\d|\.\d)")
+TS6 = re.compile(r"fd7a:115c:a1e0:[0-9a-f]{1,4}:[0-9a-f]{1,4}:", re.I)
+TAILNET = re.compile(r"\btail[0-9a-f]{5,8}\.ts\.net\b", re.I)
+# Старые находки, уже попавшие в историю до появления этого правила (версии 0.20.0 и 0.21.0). В текущих файлах их нет; из истории их убрать можно
+# только переписав её, поэтому они учтены по отпечатку строки (сами значения здесь не записаны) и не мешают проверке истории. Новые находки ловятся.
+KNOWN_OLD = {"621b63e09d45ffea", "935bdaca126e4688"}
+
+
+def real_addresses(line):
+    hits = [m.group(0) for m in CGNAT4.finditer(line) if not m.group(0).startswith("100.64.0.")]
+    return hits + [m.group(0) for m in TS6.finditer(line)] + [m.group(0) for m in TAILNET.finditer(line)]
+
+
+def fingerprint(entry):
+    return hashlib.sha256(entry.encode("utf-8")).hexdigest()[:16]
 
 
 def private_regex():
@@ -104,6 +123,11 @@ def main():
         words = [f"{p}: {l.strip()}" for p, l in lines if p not in SELF and private.search(l)]
         if words:
             report("личные слова", "в тексте найдены слова из вашего закрытого списка data/private-words.txt:", words)
+    addr = [f"{p}: {l.strip()}" for p, l in lines if p not in SELF and real_addresses(l)]
+    if mode == "history":
+        addr = [a for a in addr if fingerprint(a) not in KNOWN_OLD]
+    if addr:
+        report("адреса сети", "в тексте найден настоящий адрес или имя сети Tailscale (в примерах только 100.64.0.x и fd7a:115c:a1e0::):", addr)
     if not fail:
         print(f"Чисто: секретов и личных данных не найдено ({mode}).")
     sys.exit(1 if fail else 0)

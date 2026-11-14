@@ -51,8 +51,8 @@ class LabelTests(unittest.TestCase):
 
 class WhereTests(unittest.TestCase):
     def test_places(self):
-        for addr, want in (("192.168.10.147", "home"), ("10.0.0.5", "home"), ("172.16.3.4", "home"), ("169.254.1.1", "home"), ("127.0.0.1", "internet"), ("::1", "internet"),
-                           ("100.109.6.85", "tailscale"), ("8.8.8.8", "internet"), ("", "unknown"), (None, "unknown"), ("мусор", "unknown"), ("fd7a:115c:a1e0::1", "home")):
+        for addr, want in (("192.168.1.47", "home"), ("10.0.0.5", "home"), ("172.16.3.4", "home"), ("169.254.1.1", "home"), ("127.0.0.1", "internet"), ("::1", "internet"),
+                           ("100.64.0.7", "tailscale"), ("8.8.8.8", "internet"), ("", "unknown"), (None, "unknown"), ("мусор", "unknown"), ("fd7a:115c:a1e0::1", "home")):
             self.assertEqual(devices.where_from(addr), want, addr)
 
 
@@ -80,7 +80,7 @@ class LoginLogTests(unittest.TestCase):
         self.tmp.cleanup()
 
     def test_success_is_recorded_without_address_or_user_agent(self):
-        e = devices.record_login(self.dir, True, UA["iphone"], "192.168.10.147", "a" * 12, now=1000)
+        e = devices.record_login(self.dir, True, UA["iphone"], "192.168.1.47", "a" * 12, now=1000)
         self.assertEqual((e["ok"], e["dev"], e["where"], e["ts"]), (True, "iPhone · Safari", "home", 1000))
         raw = (self.dir / "logins.json").read_text()
         self.assertNotIn("192.168", raw)
