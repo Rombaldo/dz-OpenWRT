@@ -458,5 +458,82 @@ class IntegrationTests(PushBase):
         self.assertEqual((msg["title"], msg["body"]), ("Новая оценка: 5", "Математика · Ответ на уроке (12 ноября)"))
 
 
+class _Resp:
+    status = 201
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
+class _Opener:
+    """Подставной «браузер»: запоминает, через какой прокси его просили, и отвечает заданным образом."""
+    def __init__(self, proxies, result):
+        self.proxies, self.result = proxies, result
+
+    def open(self, req, timeout=0):
+        if isinstance(self.result, Exception):
+            raise self.result
+        return self.result
+
+
+class ProxyFallbackTests(unittest.TestCase):
+    """Где оператор закрывает службы пушей, отправка повторяется через прокси, включённый на роутере для Tailscale."""
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.init = Path(self.tmp.name) / "tailscale"
+        self.made = []
+        self.results = []
+
+        def build_opener(handler):
+            op = _Opener(handler.proxies, self.results.pop(0))
+            self.made.append(op)
+            return op
+        for p in (mock.patch.dict(os.environ, {"DNEVNIK_TS_INIT": str(self.init)}),
+                  mock.patch("urllib.request.build_opener", build_opener)):
+            p.start()
+            self.addCleanup(p.stop)
+
+    def test_reads_proxy_from_tailscale_service(self):
+        self.init.write_text("export HTTPS_PROXY=http://127.0.0.1:7890 HTTP_PROXY=http://127.0.0.1:7890\n")
+        self.assertEqual(push.fallback_proxy(), "http://127.0.0.1:7890")
+
+    def test_no_proxy_when_not_configured(self):
+        self.assertIsNone(push.fallback_proxy())                       # файла нет
+        self.init.write_text("start() { echo hi; }\n")
+        self.assertIsNone(push.fallback_proxy())                       # строки нет
+
+    def test_direct_success_does_not_use_proxy(self):
+        self.init.write_text("HTTPS_PROXY=http://127.0.0.1:7890\n")
+        self.results = [_Resp()]
+        self.assertEqual(push.default_post("https://x/", {}, b"1"), (201, ""))
+        self.assertEqual(len(self.made), 1)
+        self.assertEqual(self.made[0].proxies, {})                     # первая попытка без прокси, не по окружению
+
+    def test_retries_through_proxy_when_direct_refused(self):
+        self.init.write_text("HTTPS_PROXY=http://127.0.0.1:7890\n")
+        self.results = [ConnectionRefusedError("refused"), _Resp()]
+        self.assertEqual(push.default_post("https://x/", {}, b"1"), (201, ""))
+        self.assertEqual(len(self.made), 2)
+        self.assertEqual(self.made[1].proxies["https"], "http://127.0.0.1:7890")
+
+    def test_no_retry_without_proxy(self):
+        self.results = [ConnectionRefusedError("refused")]
+        with self.assertRaises(OSError):
+            push.default_post("https://x/", {}, b"1")
+        self.assertEqual(len(self.made), 1)
+
+    def test_http_error_from_service_is_not_retried(self):
+        import io
+        import urllib.error
+        self.init.write_text("HTTPS_PROXY=http://127.0.0.1:7890\n")
+        self.results = [urllib.error.HTTPError("https://x/", 410, "gone", {}, io.BytesIO(b"gone"))]
+        self.assertEqual(push.default_post("https://x/", {}, b"1")[0], 410)
+        self.assertEqual(len(self.made), 1)
+
+
 if __name__ == "__main__":
     unittest.main()

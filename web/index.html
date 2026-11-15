@@ -590,10 +590,10 @@ try { const s = JSON.parse(localStorage.getItem("settings") || "{}");
   .scr-card.light .brow.me { background: var(--brand-soft); box-shadow: 0 0 0 2px var(--brand) inset; }
   .scr-card.light .cir { color: #2f6ff0; } .scr-card.light .cir.alt { color: #b93cb4; } .scr-card.light .cir.c2 { color: #1d8f68; } .scr-card.light .cir.c3 { color: #c47a12; }
   .atile strong, .avg2 strong { color: inherit; }
-  .bar2 { flex: 1 1 0; min-width: 72px; display: flex; align-items: center; justify-content: space-between; background: linear-gradient(90deg, #3d8af7, #5fa4ff); color: #fff; border-radius: 99px; padding: 0 0 0 14px; height: 34px; max-width: var(--w, 150px); font-weight: 600; font-size: 15px; }
+  .bline { flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 6px; }   /* полоска + балл + изменение; длина полоски — доля места до «хвоста» (балл и изменение), поэтому ступеньки ровные */
+  .bar2 { flex: none; width: max(72px, calc((100% - var(--tail, 108px)) * var(--f, 1))); display: flex; align-items: center; justify-content: space-between; background: linear-gradient(90deg, #3d8af7, #5fa4ff); color: #fff; border-radius: 99px; padding: 0 0 0 14px; height: 34px; font-weight: 600; font-size: 15px; }
   .bar2.alt { background: linear-gradient(90deg, #d955d4, #ef84ea); }
   .bar2.c2 { background: linear-gradient(90deg, #2fb98b, #5fd8ad); } .bar2.c3 { background: linear-gradient(90deg, #f0a032, #ffc066); }
-  .b-list .bar2 { max-width: none; flex: 0 1 var(--w, 60%); }
   .av { width: 36px; height: 36px; border-radius: 50%; background: #fff; display: inline-flex; align-items: center; justify-content: center; font-style: normal; font-size: 21px; margin: -1px; flex: none; box-shadow: 0 0 0 2px rgba(255,255,255,.7); }
   .av.own { background: linear-gradient(160deg, #ffe08a, #ffc24a); color: #5b3a00; font-weight: 800; font-size: 17px; }
   .bm { font-weight: 800; flex: none; font-variant-numeric: tabular-nums; }
@@ -601,8 +601,11 @@ try { const s = JSON.parse(localStorage.getItem("settings") || "{}");
   .dl.pos { color: #3ccf7b; } .dl.neg { color: #ff7e88; }
   .scr-card.light .dl.pos, .scr.light .dl.pos { color: #16984f; } .scr-card.light .dl.neg, .scr.light .dl.neg { color: #d12f3a; }
   .dl.solid { color: #fff !important; box-shadow: none; } .dl.pos.solid { background: #22a055; } .dl.neg.solid { background: #d62d36; }
-  .rk { margin-left: auto; flex: none; display: inline-flex; align-items: center; gap: 4px; font-size: 11px; opacity: .9; line-height: 1.1; }
-  .brow .rk small { font-size: 11px; }
+  .rk { width: 76px; flex: none; display: inline-flex; align-items: center; gap: 4px; font-size: 11px; opacity: .9; line-height: 1.1; }
+  .brow .rk small { font-size: 10.5px; }
+  .brow .rk .dia.sm { min-width: 28px; height: 28px; font-size: 13px; padding: 0 2px; }
+  .brow .bm { font-size: 15px; }
+  .brow .dl { padding: 1px 6px; }
   .srow { display: flex; align-items: center; gap: 12px; width: 100%; border: 0; background: transparent; color: inherit; text-align: left; padding: 12px 4px; border-top: 1px solid rgba(255,255,255,.12); font-size: 18px; }
   .srow:first-of-type { border-top: 0; }
   .srow .sn { flex: 1; min-width: 0; overflow-wrap: anywhere; }
@@ -780,7 +783,12 @@ try { const s = JSON.parse(localStorage.getItem("settings") || "{}");
   .nav .ttl { text-shadow: 0 0 8px color-mix(in srgb, var(--card) 85%, transparent); }
   .seg button { min-width: 0; padding-left: 2px; padding-right: 2px; }                     /* пункты переключателя сжимаются, а не вылезают за карточку */
   .seg:has(button:nth-child(5)) button { font-size: 14px; letter-spacing: -.1px; }
-  @media (max-width: 350px) { .brow .rk small { display: none; } }                          /* самый узкий телефон: подпись «место в классе» не влезает, остаётся значок */
+  .rk-note { display: none; font-size: 12px; opacity: .8; padding: 0 8px 4px; align-items: center; gap: 6px; }
+  .rk-note .dia.sm { min-width: 14px; height: 14px; padding: 0; display: inline-block; }
+  @media (max-width: 480px) {                                                                /* телефон: «место в 5А» словами не влезает рядом с полоской, остаётся ромб и подпись над списком */
+    .brow .rk small { display: none; } .rk { width: 28px; } .rk-note { display: flex; }
+    .brow .rk .dia.sm { min-width: 26px; height: 26px; font-size: 12px; }
+  }
 </style>
 </head>
 <body>
@@ -1628,20 +1636,37 @@ function around(rows) {                                                    // т
   return rows.slice(st, st + 3);
 }
 const markNum = (m) => { const v = parseFloat(String(m || "").replace(",", ".")); return Number.isFinite(v) ? v : null; };
-const barWidth = (m) => { const v = markNum(m); return v == null ? 60 : Math.max(32, Math.min(100, Math.round(((v - 2) / 3) * 100))); };   // длина полоски — по среднему баллу, как в приложении
+const barFrac = (m, sc) => {                                               // доля длины полоски: чем выше балл, тем длиннее (в списках «ёлочкой», внутри списка)
+  const v = markNum(m);
+  if (v == null) return 0.6;
+  const lo = sc ? sc.lo : 2, hi = sc ? sc.hi : 5;
+  return Math.max(0.3, Math.min(1, 0.5 + 0.5 * (v - lo) / (hi - lo)));
+};
+function barScale(rows) {                                                  // шкала списка: от самого низкого балла до самого высокого (не уже 0,25, иначе мелкая разница раздувается)
+  const v = rows.map((r) => markNum(r[R_M])).filter((x) => x != null);
+  if (!v.length) return null;
+  const hi = Math.max(...v);
+  return { hi, lo: Math.min(Math.min(...v), hi - 0.25) };
+}
 function classTone(idx, mine) {                                           // свой класс синий, остальные — розовый, зелёный, оранжевый
   if (idx === mine) return "";
   return ["alt", "c2", "c3"][(idx > mine ? idx - 1 : idx) % 3];
 }
 
-function boardRow(r, mode, myCls, classes) {
+function boardRow(r, mode, myCls, classes, opt = {}) {
   const place = mode === "class" ? r[R_K] : r[R_P], mine = r[R_C] === myCls, name = classes[r[R_C]] || "", tone = classTone(r[R_C], myCls);
   const badge = mode === "class" ? `<span class="dia sm">${place}</span>` : `<span class="dw"><span class="cir ${tone}">${place}</span>${place === 1 ? `<i class="crown">👑</i>` : ""}</span>`;
   const who = r[R_ME] ? esc((data?.student?.name || "Я").slice(0, 1).toUpperCase()) : avatarOf(r[R_A]);
   const chg = r[R_D] ? `<span class="dl ${downChange(r[R_D]) ? "neg" : "pos"} ${r[R_ME] ? "solid" : ""}">${esc(fmtChange(r[R_D]))}</span>` : "";
-  const right = mode === "all" && r[R_K] && mine ? `<span class="rk"><span class="dia sm">${r[R_K]}</span><small>место<br>в ${esc(name)}</small></span>` : "";
-  return `<div class="brow ${r[R_ME] ? "me" : ""}">${badge}<span class="bar2 ${tone}" style="--w:${barWidth(r[R_M])}%"><span>${esc(name)}</span><i class="av ${r[R_ME] ? "own" : ""}">${who}</i></span>
-    <span class="bm">${esc(r[R_M])}</span>${chg}${right}</div>`;
+  const has = mode === "all" && r[R_K] && mine;
+  const right = has ? `<span class="rk"><span class="dia sm">${r[R_K]}</span><small>место<br>в ${esc(name)}</small></span>` : (opt.reserve ? `<span class="rk ph"></span>` : "");
+  return `<div class="brow ${r[R_ME] ? "me" : ""}">${badge}<span class="bline" style="--f:${barFrac(r[R_M], opt.scale).toFixed(3)}"><span class="bar2 ${tone}"><span>${esc(name)}</span><i class="av ${r[R_ME] ? "own" : ""}">${who}</i></span>
+    <span class="bm">${esc(r[R_M])}</span>${chg}</span>${right}</div>`;
+}
+function boardRows(rows, mode, myCls, classes, scaleRows = rows) {          // список строк: полоски одной шкалы, место справа занимает одно и то же место у всех
+  const opt = { scale: barScale(scaleRows), reserve: mode === "all" && rows.some((r) => r[R_K] && r[R_C] === myCls) };
+  const note = opt.reserve ? `<div class="rk-note"><i class="dia sm"></i> — место в своём классе</div>` : "";   // подпись у ромба: на телефоне вместо «место в 5А» (там не хватает ширины)
+  return note + rows.map((x) => boardRow(x, mode, myCls, classes, opt)).join("");
 }
 
 // ---------- история мест: сайт показывает только сегодняшние места, прежние копит роутер (раз в день) ----------
@@ -1784,7 +1809,7 @@ function renderScreen(anim = "") {
   document.body.classList.toggle("has-screen", !!sc);
   if (!sc || !data) { el.innerHTML = ""; el.className = ""; delete el.dataset.sig; return; }
   const top = el.scrollTop, same = el.dataset.sig === JSON.stringify(sc);
-  const parts = { rating: ratingScreen, board: boardScreen, subject: subjectScreen, lesson: lessonScreen, subjects: subjectsScreen, cls: clsScreen }[sc.t](sc);
+  const parts = { rating: ratingScreen, board: boardScreen, subject: subjectScreen, lesson: lessonScreen, cls: clsScreen }[sc.t](sc);
   el.className = `scr scr-${sc.t} ${parts.theme || ""} ${anim}`;
   el.innerHTML = parts.html;
   el.dataset.sig = JSON.stringify(sc);
@@ -1799,7 +1824,7 @@ function ratingScreen(sc) {
   if (view === "cls") return { html: h + classesView(), theme: "blue" };
   h += ratingPlaques(true);
   h += sparkChart();
-  const mini = (mode) => around(listFor(board, mode)).map((x) => boardRow(x, mode, me?.[R_C], classes)).join("");
+  const mini = (mode) => boardRows(around(listFor(board, mode)), mode, me?.[R_C], classes, listFor(board, mode));
   if (board.length && me) {
     h += `<h2 class="scr-h">Рейтинг общий</h2><div class="scr-card"><div class="scr-card-h"><b>Место в классе</b><button class="lnk" data-open-board="" data-bmode="class">Открыть все</button></div>${mini("class")}</div>
       <div class="scr-card"><div class="scr-card-h"><b>Место в параллели</b><button class="lnk" data-open-board="" data-bmode="all">Открыть все</button></div>${mini("all")}</div>`;
@@ -1807,7 +1832,7 @@ function ratingScreen(sc) {
   const subs = [...(r?.subjects || [])].filter((x) => x.place).sort((a, b) => a.place - b.place);
   if (subs.length) {
     h += `<h2 class="scr-h">Рейтинг по предметам</h2><p class="scr-note">На основе данных о среднем балле учащихся в параллели${r.period ? ` (${esc(r.period)})` : ""}</p>
-      <div class="scr-card"><div class="scr-card-h"><b>Ваши лучшие места по предмету</b>${subs.length > 3 ? `<button class="lnk" data-open-subjects>Открыть все</button>` : ""}</div>${subs.slice(0, 3).map(subjectRow).join("")}</div>`;
+      <div class="scr-card"><div class="scr-card-h"><b>Ваши места по предметам</b></div>${subs.map(subjectRow).join("")}</div>`;
   }
   return { html: h, theme: "blue" };
 }
@@ -1815,11 +1840,6 @@ function subjectRow(x) {
   return `<button class="srow" data-open-board="${esc(x.name)}" data-bmode="all"><span class="dw"><span class="dia sm s">${x.place}</span>${x.place === 1 ? `<i class="crown">👑</i>` : ""}</span>
     <span class="sn">${esc(x.name)}</span><span class="sv">${esc(x.mark || "")}</span>
     ${x.change ? `<span class="dl ${downChange(x.change) ? "neg" : "pos"} solid">${esc(fmtChange(x.change))}</span>` : ""}<span class="chv">›</span></button>`;
-}
-function subjectsScreen() {
-  const r = ratingData(), subs = [...(r?.subjects || [])].filter((x) => x.place).sort((a, b) => a.place - b.place);
-  return { theme: "blue", html: scrTop("Рейтинг по предметам", r?.period || "") + `<p class="scr-note" style="text-align:center">На основе данных о среднем балле учащихся в параллели</p>
-    <div class="scr-card"><b>Ваш рейтинг по предметам</b>${subs.map(subjectRow).join("") || `<div class="scr-note">Пока пусто.</div>`}</div>` };
 }
 function boardScreen(sc) {
   const r = ratingData(), sub = sc.name ? ratingFor(sc.name) : null, classes = r?.classes || [];
@@ -1830,7 +1850,7 @@ function boardScreen(sc) {
   const line = k && pl ? `<b>${esc(nm)}</b>сейчас на ${k}-м месте <span class="medal">🥇</span> в классе и на ${pl}-м месте в параллели` : `<b>${esc(nm)}</b>`;
   return { theme: "blue", html: scrTop(sub ? `Рейтинг по предмету ${sub.name}` : "Персональный рейтинг") + `<div class="b-line">${line}</div>
     <div class="b-cols"><span>Место в ${sc.mode === "class" ? "классе" : "параллели"}</span><span>Ср. балл</span><button class="tgl" data-bmode-toggle>${esc(toggle)}</button></div>
-    <div class="b-list">${rows.map((x) => boardRow(x, sc.mode, me?.[R_C], classes)).join("") || `<div class="scr-note">Списка пока нет.</div>`}</div>` };
+    <div class="b-list">${boardRows(rows, sc.mode, me?.[R_C], classes) || `<div class="scr-note">Списка пока нет.</div>`}</div>` };
 }
 
 // Подсказка сайта, как в приложении: «Получите 6×5 или 20×4, чтобы повысить балл до четверки», «покорим новые вершины», «мало оценок»
@@ -1884,7 +1904,7 @@ function subjectScreen(sc) {
   let h = scrTop(name, ratingData()?.period || "");
   if (me && board.length) {
     const past = pastPoints((e) => e.s?.[name]?.[1]);
-    h += `<div class="scr-card light"><div class="scr-card-h"><b>В параллели</b><b class="r">В классе</b></div>${around(board).map((x) => boardRow(x, "all", me[R_C], classes)).join("")}
+    h += `<div class="scr-card light"><div class="scr-card-h"><b>В параллели</b><b class="r">В классе</b></div>${boardRows(around(board), "all", me[R_C], classes, board)}
       ${past.length ? `<div class="note-calc">Раньше в параллели: ${past.map((p) => `${shortDate(p.d)} — ${p.v}`).join(", ")}</div>` : ""}
       <button class="lnk center" data-open-board="${esc(name)}" data-bmode="all">Открыть все ›</button></div>`;
   }
@@ -2367,7 +2387,6 @@ document.addEventListener("click", (e) => {
   if (mk) { openMark(mk.dataset.mark, mk); return; }
   if (e.target.closest("[data-scr-back]")) { backScreen(); return; }
   if (e.target.closest("[data-open-rating]")) { openScreen({ t: "rating" }); return; }
-  if (e.target.closest("[data-open-subjects]")) { openScreen({ t: "subjects" }); return; }
   const oc = e.target.closest("[data-open-cls]");
   if (oc) { openScreen({ t: "cls", name: oc.dataset.openCls }); return; }
   const rv = e.target.closest("[data-rview]");

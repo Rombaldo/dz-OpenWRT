@@ -249,13 +249,40 @@ def status(data_dir):
 
 
 # ---------------------------------------------------------------- отправка
-def default_post(url, headers, body, timeout=15):
-    req = urllib.request.Request(url, data=body, headers=headers, method="POST")
+def fallback_proxy():
+    """Прокси, который человек уже включил на роутере для Tailscale (строка HTTPS_PROXY в службе), или None.
+    Нужен там, где оператор пускает наружу только часть сайтов: напрямую до служб пушей не достучаться, через прокси можно."""
+    init = os.environ.get("DNEVNIK_TS_INIT", "/etc/init.d/tailscale")
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            return r.status, ""
+        text = Path(init).read_text(errors="replace")
+    except OSError:
+        return None
+    m = re.search(r"HTTPS_PROXY=http://([0-9A-Za-z.\-]+:\d+)", text)
+    return "http://" + m.group(1) if m else None
+
+
+def default_post(url, headers, body, timeout=15):
+    """Отправка одного сообщения. Сначала напрямую; если сети нет и на роутере есть прокси для Tailscale, повтор через него."""
+    req = urllib.request.Request(url, data=body, headers=headers, method="POST")
+    direct = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    try:
+        return _open(direct, req, timeout)
     except urllib.error.HTTPError as e:
         return e.code, (e.read(300) or b"").decode("utf-8", "replace")
+    except OSError:
+        proxy = fallback_proxy()
+        if not proxy:
+            raise
+    via = urllib.request.build_opener(urllib.request.ProxyHandler({"https": proxy, "http": proxy}))
+    try:
+        return _open(via, req, timeout)
+    except urllib.error.HTTPError as e:
+        return e.code, (e.read(300) or b"").decode("utf-8", "replace")
+
+
+def _open(opener, req, timeout):
+    with opener.open(req, timeout=timeout) as r:
+        return r.status, ""
 
 
 def message(m):

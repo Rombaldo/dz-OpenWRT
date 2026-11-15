@@ -64,6 +64,35 @@ class RatingUiTests(MarksUiBase):
         page.close()
         self.assertEqual(self.errors, [])
 
+    def test_bars_form_a_staircase_whatever_sits_on_the_right(self):
+        """Чем выше балл, тем длиннее полоска, и порядок не ломают значки «место в классе» и изменения справа (на любой ширине)."""
+        js = """() => [...document.querySelectorAll('#screen .b-list .brow')].map(r => {
+            const b = r.querySelector('.bar2').getBoundingClientRect(), row = r.getBoundingClientRect();
+            const line = r.querySelector('.bline'), last = line.lastElementChild.getBoundingClientRect(), rk = r.querySelector('.rk');
+            const over = r.scrollWidth > r.clientWidth + 1 || last.right > line.getBoundingClientRect().right + 1 || (rk && last.right > rk.getBoundingClientRect().left + 1) || b.right > row.right + 1;
+            return {w: Math.round(b.width), m: parseFloat(r.querySelector('.bm').textContent.replace(',', '.')), over};
+        })"""
+        for width, zoom in ((320, 1), (390, 1), (390, 1.25), (768, 1)):                   # 1,25: крупный шрифт в настройках (эффективная ширина всего 312)
+            page = self.open()
+            page.set_viewport_size({"width": width, "height": 900})
+            page.evaluate(f"document.documentElement.style.zoom = '{zoom}'")
+            page.click(".plq")
+            page.wait_for_selector("#screen.scr-rating")
+            page.click('#screen [data-open-board=""][data-bmode="all"]')
+            page.wait_for_selector("#screen.scr-board")
+            rows = page.evaluate(js)
+            self.assertGreater(len(rows), 30)
+            for a, b in zip(rows, rows[1:]):
+                if a["m"] > b["m"]:
+                    self.assertGreaterEqual(a["w"], b["w"], f"{width}px: {a} короче {b}")     # ёлочка: не короче, чем у того, у кого балл ниже
+                elif a["m"] == b["m"]:
+                    self.assertEqual(a["w"], b["w"], f"{width}px: равные баллы, разная длина")
+            self.assertFalse(any(r["over"] for r in rows), f"{width}px x{zoom}: строка вылезает")
+            if width >= 390 and zoom == 1:
+                self.assertGreater(rows[0]["w"], rows[-1]["w"] + 20)                          # ступеньки видны глазом
+            page.close()
+        self.assertEqual(self.errors, [])
+
     def test_escape_closes_the_top_screen(self):
         page = self.open()
         page.click(".plq")
@@ -172,13 +201,9 @@ class RatingUiTests(MarksUiBase):
         page.click(".plq")
         page.wait_for_selector("#screen.scr-rating")
         self.assertTrue(page.query_selector("#screen svg.spark polyline"))                 # график мест по дням
-        self.assertIn("Ваши лучшие места по предмету", self.screen(page))
-        self.assertLessEqual(len(page.query_selector_all("#screen .srow")), 3)
-        page.click("#screen [data-open-subjects]")
-        page.wait_for_selector("#screen.scr-subjects")
-        self.assertEqual(len(page.query_selector_all("#screen .srow")), 7)                 # полный список предметов
-        page.click("#screen [data-scr-back]")
-        page.wait_for_selector("#screen.scr-rating")
+        self.assertIn("Ваши места по предметам", self.screen(page))
+        self.assertEqual(len(page.query_selector_all("#screen .srow")), 7)                 # все предметы сразу, без «Открыть все»
+        self.assertIsNone(page.query_selector("#screen [data-open-subjects]"))
         page.click('#screen [data-rview="cls"]')
         self.assertIn("Ваш класс 5А", self.screen(page))
         self.assertTrue(page.query_selector("#screen .cb.mine"))                          # свой класс выделен
