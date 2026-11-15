@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#5468f0">
+<meta name="theme-color" content="#3b63f0">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Дневник">
@@ -15,128 +15,160 @@
 // Тема и размер применяются до отрисовки, чтобы страница не мигала
 try { const s = JSON.parse(localStorage.getItem("settings") || "{}");
   if (s.theme === "light" || s.theme === "dark") document.documentElement.dataset.theme = s.theme;
-  if ([0.9, 1.1, 1.2].includes(s.scale)) document.documentElement.style.zoom = s.scale; } catch (e) {}
+  if ([0.8, 0.9, 1.1, 1.2].includes(s.scale)) document.documentElement.style.zoom = s.scale; } catch (e) {}
 </script>
 <style>
+  /* ===================== Оформление «Мой дневник» 2.0 =====================
+     Токены цвета и формы. Тёмная тема переопределяет только токены. */
   :root {
-    --bg: #f2f4ff; --card: #ffffff; --ink: #1c2236; --muted: #667089; --line: #e6e9f6;
-    --brand: #5468f0; --brand-ink: #ffffff; --brand-2: #8a5cf6; --brand-soft: #e9edff; --ok: #1f9d55; --ok-soft: #e0f6e9;
-    --shadow: 0 1px 2px rgba(40,50,110,.06), 0 6px 18px rgba(40,50,110,.06);
-    --m5: #1fa55b; --m4: #6cc04a; --m3: #f2a516; --m2: #ee6a3c; --m1: #dc3b45; --mx: #8b94ab;
+    --bg: #f3f5fb; --bg-2: #e9edf8; --card: #ffffff; --card-2: #f5f7fc; --ink: #131a33; --muted: #6a7390; --line: #e6e9f2;
+    --brand: #3b63f0; --brand-2: #7454f5; --brand-ink: #ffffff; --brand-soft: #e8eeff; --brand-deep: #1b2a7a;
+    --ok: #13a057; --ok-soft: #dff6e9;
+    --shadow: 0 1px 1px rgba(16,24,64,.04), 0 6px 20px rgba(16,24,64,.07);
+    --shadow-lg: 0 18px 50px rgba(16,24,64,.20);
+    --m5: #20b05c; --m4: #78c03f; --m3: #f4a321; --m2: #ef6a39; --m1: #e03a48; --mx: #8b94ab;
     --banner-warn-bg: #fff3d6; --banner-warn-ink: #6a4700; --banner-bad-bg: #ffe3e3; --banner-bad-ink: #7d1d1d;
     --banner-info-bg: #e4eaff; --banner-info-ink: #263b8c;
-    --soft: #f2f4ff; --strip-bg: #dbe6ff; --strip-edge: #ffffff; --strip-check: rgba(255,255,255,.6);
+    --soft: #f1f4fc; --strip-bg: #e3ebff; --strip-edge: #c6d3fb; --strip-check: #ffffff;
     --warn-bg: #fff0e0; --warn-ink: #b45309;
     --c-ill-bg: #fff0d6; --c-ill: #b45309; --c-abs-bg: #ffe0e0; --c-abs: #b3261e; --c-late-bg: #e7ddff; --c-late: #5a3fc0;
+    --glass: rgba(255,255,255,.78); --glass-line: rgba(255,255,255,.9);
+    --navy-1: #1f4fd0; --navy-2: #0a1452; --night-1: #0d4ad8; --night-2: #061a5c; --night-3: #030b2c;
+    --ease: cubic-bezier(.2,.8,.2,1);
     color-scheme: light;
   }
   /* Тёмная тема: выбрана вручную или включена на устройстве (если не выбрана светлая). Значения ниже записаны дважды. */
   :root[data-theme="dark"] {
-    --bg: #10131e; --card: #1a1f31; --ink: #eef1fb; --muted: #9aa3bd; --line: #2a3048;
-    --brand: #7c8fff; --brand-ink: #10131e; --brand-2: #a583ff; --brand-soft: #232b55; --ok: #46c27a; --ok-soft: #173525;
-    --shadow: 0 1px 2px rgba(0,0,0,.3);
+    --bg: #0b0f1d; --bg-2: #10162a; --card: #161c30; --card-2: #1c2339; --ink: #eef1fb; --muted: #96a0bc; --line: #262e48;
+    --brand: #7b93ff; --brand-2: #a98bff; --brand-ink: #0b0f1d; --brand-soft: #222b55; --brand-deep: #c9d4ff;
+    --ok: #45c47a; --ok-soft: #15321f;
+    --shadow: 0 1px 1px rgba(0,0,0,.25), 0 8px 24px rgba(0,0,0,.25);
+    --shadow-lg: 0 18px 50px rgba(0,0,0,.55);
     --banner-warn-bg: #3a2f12; --banner-warn-ink: #ffd9a0; --banner-bad-bg: #3b1a1a; --banner-bad-ink: #ffbcbc;
     --banner-info-bg: #1d2850; --banner-info-ink: #c7d4ff;
-    --soft: #222842; --strip-bg: #2c3768; --strip-edge: #4a5690; --strip-check: transparent;
+    --soft: #1c2339; --strip-bg: #222c55; --strip-edge: #3e4b85; --strip-check: transparent;
     --warn-bg: #3a2a14; --warn-ink: #ffc277;
     --c-ill-bg: #4a3716; --c-ill: #ffc277; --c-abs-bg: #4a1d1d; --c-abs: #ff9b95; --c-late-bg: #2f2656; --c-late: #c7b6ff;
+    --glass: rgba(22,28,48,.8); --glass-line: rgba(255,255,255,.08);
     color-scheme: dark;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --bg: #10131e; --card: #1a1f31; --ink: #eef1fb; --muted: #9aa3bd; --line: #2a3048;
-      --brand: #7c8fff; --brand-ink: #10131e; --brand-2: #a583ff; --brand-soft: #232b55; --ok: #46c27a; --ok-soft: #173525;
-      --shadow: 0 1px 2px rgba(0,0,0,.3);
+      --bg: #0b0f1d; --bg-2: #10162a; --card: #161c30; --card-2: #1c2339; --ink: #eef1fb; --muted: #96a0bc; --line: #262e48;
+      --brand: #7b93ff; --brand-2: #a98bff; --brand-ink: #0b0f1d; --brand-soft: #222b55; --brand-deep: #c9d4ff;
+      --ok: #45c47a; --ok-soft: #15321f;
+      --shadow: 0 1px 1px rgba(0,0,0,.25), 0 8px 24px rgba(0,0,0,.25);
+      --shadow-lg: 0 18px 50px rgba(0,0,0,.55);
       --banner-warn-bg: #3a2f12; --banner-warn-ink: #ffd9a0; --banner-bad-bg: #3b1a1a; --banner-bad-ink: #ffbcbc;
       --banner-info-bg: #1d2850; --banner-info-ink: #c7d4ff;
-      --soft: #222842; --strip-bg: #2c3768; --strip-edge: #4a5690; --strip-check: transparent;
+      --soft: #1c2339; --strip-bg: #222c55; --strip-edge: #3e4b85; --strip-check: transparent;
       --warn-bg: #3a2a14; --warn-ink: #ffc277;
       --c-ill-bg: #4a3716; --c-ill: #ffc277; --c-abs-bg: #4a1d1d; --c-abs: #ff9b95; --c-late-bg: #2f2656; --c-late: #c7b6ff;
+      --glass: rgba(22,28,48,.8); --glass-line: rgba(255,255,255,.08);
       color-scheme: dark;
     }
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   /* Один размер текста на всех экранах; крупнее или мельче делается в «Настройках» (zoom на странице целиком) */
   html, body { margin: 0; background: var(--bg); color: var(--ink);
-    font: 18px/1.42 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
-  body { padding-bottom: calc(90px + env(safe-area-inset-bottom)); }
-  button { font: inherit; color: inherit; }
+    font: 18px/1.42 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased; }
+  body { padding-bottom: calc(112px + env(safe-area-inset-bottom)); }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  button:active:not(:disabled) { transform: scale(.97); }
+  button { transition: transform .12s var(--ease), background-color .2s, color .2s, box-shadow .2s, opacity .2s; }
+  .num { font-variant-numeric: tabular-nums; }
 
   /* ---- шапка ---- */
-  header { background: linear-gradient(135deg, var(--brand), var(--brand-2)); color: #fff; position: relative; overflow: hidden;
-    padding: calc(8px + env(safe-area-inset-top)) 16px 10px; }
-  header::before, header::after { content: ""; position: absolute; border-radius: 50%; background: rgba(255,255,255,.12); }
-  header::before { width: 180px; height: 180px; right: -50px; top: -70px; }
-  header::after { width: 110px; height: 110px; right: 90px; bottom: -70px; }
+  header { background: linear-gradient(135deg, var(--navy-1) 0%, var(--brand) 45%, var(--brand-2) 100%); color: #fff; position: relative; overflow: hidden;
+    padding: calc(10px + env(safe-area-inset-top)) 16px 14px; border-radius: 0 0 26px 26px; }
+  header::before, header::after { content: ""; position: absolute; border-radius: 50%; pointer-events: none; }
+  header::before { width: 260px; height: 260px; right: -90px; top: -120px; background: radial-gradient(circle at 30% 30%, rgba(255,255,255,.28), rgba(255,255,255,0) 70%); }
+  header::after { width: 180px; height: 180px; left: -60px; bottom: -110px; background: radial-gradient(circle, rgba(255,255,255,.16), rgba(255,255,255,0) 70%); }
   .head-in { max-width: 1100px; margin: 0 auto; display: flex; align-items: center; gap: 12px; position: relative; z-index: 1; }
   .head-in .grow { flex: 1; min-width: 0; }
-  .hello { font-size: 20px; font-weight: 800; letter-spacing: -.2px; margin: 0; line-height: 1.2; }
+  .avatar { width: 42px; height: 42px; min-width: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 20px;
+    background: rgba(255,255,255,.22); box-shadow: 0 0 0 2px rgba(255,255,255,.45) inset; }
+  .hello { font-size: 18px; font-weight: 800; letter-spacing: -.3px; margin: 0; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+  .sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .meta { flex-wrap: nowrap; min-width: 0; align-items: baseline; }
+  .meta .who { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .meta .who:not(:empty)::after { content: " ·"; }
+  @media (max-width: 600px) { .meta .who { display: none; } }
   .meta { display: flex; flex-wrap: wrap; gap: 0 10px; margin-top: 2px; }
-  .sub { font-size: 13px; opacity: .88; }
-  .who { font-size: 14px; font-weight: 700; overflow-wrap: anywhere; }
-  .refresh { background: rgba(255,255,255,.22); border: 0; border-radius: 14px; min-height: 42px; min-width: 42px; padding: 0 12px; font-size: 15px; font-weight: 600; }
-  @media (max-width: 480px) { .refresh .rlabel { display: none; } .refresh #ricon { font-size: 22px; } .head-in { gap: 8px; } }
-  .refresh:active { background: rgba(255,255,255,.35); }
-  .spin { display: inline-block; animation: spin 1s linear infinite; }
+  .sub { font-size: 13px; opacity: .85; }
+  .who { font-size: 14px; font-weight: 600; opacity: .95; overflow-wrap: anywhere; }
+  .refresh, .gear { background: rgba(255,255,255,.18); border: 0; border-radius: 50%; width: 44px; height: 44px; min-width: 44px; padding: 0; color: #fff;
+    display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 0 0 1px rgba(255,255,255,.25) inset; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+  .refresh .rlabel { display: none; }
+  .refresh svg, .gear svg { width: 22px; height: 22px; }
+  .refresh:active, .gear:active, .gear.on { background: rgba(255,255,255,.34); }
+  .spin { display: inline-flex; animation: spin 1s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  main { max-width: 1100px; margin: 0 auto; padding: 12px 16px 0; position: relative; z-index: 2; }
-  .grid > div > :first-child, .aside > h2:first-child { margin-top: 0; }   /* верх всех экранов начинается на одной высоте */
+  main { max-width: 1100px; margin: 0 auto; padding: 16px 16px 0; position: relative; z-index: 2; }
+  .grid > div > :first-child, .aside > h2:first-child { margin-top: 0; }
   .grid { display: block; }
   @media (min-width: 960px) { .grid.two { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 20px; align-items: start; } }
   .aside { display: none; }
   @media (min-width: 960px) { .aside { display: block; } }
+  /* Вход в вкладку: лёгкое появление карточек по очереди */
+  .enter > * { animation: rise .38s var(--ease) both; }
+  .enter > *:nth-child(2) { animation-delay: .04s; } .enter > *:nth-child(3) { animation-delay: .08s; } .enter > *:nth-child(4) { animation-delay: .12s; }
+  .enter > *:nth-child(5) { animation-delay: .16s; } .enter > *:nth-child(n+6) { animation-delay: .2s; }
+  @keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes pop { 0% { transform: scale(.6); } 60% { transform: scale(1.15); } 100% { transform: scale(1); } }
 
-  .banner { border-radius: 16px; padding: 12px 16px; margin: 0 0 12px; font-size: 16px; box-shadow: var(--shadow); }
+  .banner { border-radius: 18px; padding: 12px 16px; margin: 0 0 12px; font-size: 16px; box-shadow: var(--shadow); }
   .banner.warn { background: var(--banner-warn-bg); color: var(--banner-warn-ink); }
   .banner.bad { background: var(--banner-bad-bg); color: var(--banner-bad-ink); }
   .banner.info { background: var(--banner-info-bg); color: var(--banner-info-ink); }
 
-  /* ---- карточка-итог ---- */
-  .hero { background: var(--card); border-radius: 22px; padding: 18px 18px 16px; margin: 0 0 8px; box-shadow: var(--shadow); }
+  .hero { background: var(--card); border-radius: 24px; padding: 18px; margin: 0 0 8px; box-shadow: var(--shadow); }
   .hero .big { font-size: 22px; font-weight: 800; line-height: 1.25; }
   .hero .small { color: var(--muted); font-size: 15px; margin-top: 4px; }
-  .bar { height: 14px; background: var(--brand-soft); border-radius: 99px; margin-top: 14px; overflow: hidden; }
-  .bar > i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--brand), var(--brand-2)); border-radius: 99px; transition: width .35s ease; }
-  .hero.all-done .bar > i { background: linear-gradient(90deg, #35c46f, #1f9d55); }
+  .bar { height: 10px; background: var(--brand-soft); border-radius: 99px; margin-top: 14px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--brand), var(--brand-2)); border-radius: 99px; transition: width .5s var(--ease); }
+  .hero.all-done .bar > i { background: linear-gradient(90deg, #35c46f, #13a057); }
   .hero.all-done { background: var(--ok-soft); }
 
-  h2 { font-size: 19px; margin: 22px 4px 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  h2 { font-size: 20px; font-weight: 800; letter-spacing: -.2px; margin: 24px 4px 12px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .tag { font-size: 13px; font-weight: 700; padding: 3px 11px; border-radius: 99px; background: var(--brand); color: #fff; }
   .tag.soft { background: var(--brand-soft); color: var(--brand); }
 
-  /* ---- карточка урока ---- */
-  .card { background: var(--card); border-radius: 20px; padding: 14px 16px; margin: 0 0 10px; box-shadow: var(--shadow); }
+  /* ---- карточки ---- */
+  .card { background: var(--card); border-radius: 22px; padding: 14px 16px; margin: 0 0 12px; box-shadow: var(--shadow); }
   .hw { display: flex; gap: 14px; align-items: center; border-left: 6px solid var(--c, var(--brand)); transition: opacity .2s; }
-  .ic { width: 52px; height: 52px; min-width: 52px; border-radius: 16px; display: flex; align-items: center; justify-content: center;
-    font-size: 28px; background: var(--cbg, var(--brand-soft)); }
+  .ic { width: 48px; height: 48px; min-width: 48px; border-radius: 15px; display: flex; align-items: center; justify-content: center;
+    font-size: 26px; background: var(--cbg, var(--brand-soft)); }
   .hw .body { flex: 1; min-width: 0; }
   .hw .subj { font-weight: 800; font-size: 19px; }
   .hw .time { display: block; color: var(--muted); font-size: 14px; font-weight: 500; }
   @media (max-width: 480px) {
     .hw { gap: 10px; padding: 12px 12px 12px 10px; }
     .hw .ic { width: 42px; height: 42px; min-width: 42px; font-size: 23px; border-radius: 13px; }
-    .check { width: 50px; height: 50px; min-width: 50px; border-radius: 16px; }
+    .check { width: 50px; height: 50px; min-width: 50px; }
     .hw .text { font-size: 18px; }
-    .hello { font-size: 23px; }
-    .refresh { padding: 0 12px; }
+    .hello { font-size: 21px; }
   }
   .hw .text { margin-top: 3px; font-size: 19px; overflow-wrap: anywhere; }
   .hw .files { margin-top: 6px; color: var(--muted); font-size: 14px; }
-  .check { width: 56px; height: 56px; min-width: 56px; border-radius: 18px; border: 3px solid var(--line); background: transparent;
-    font-size: 30px; line-height: 1; color: transparent; transition: transform .1s, background .15s; }
-  .check:active { transform: scale(.92); }
+  .check { width: 52px; height: 52px; min-width: 52px; border-radius: 50%; border: 2.5px solid var(--line); background: transparent;
+    font-size: 26px; line-height: 1; color: transparent; }
   .hw.done { opacity: .6; }
-  .hw.done .check { background: var(--ok); border-color: var(--ok); color: #fff; }
+  .hw.done .check { background: var(--ok); border-color: var(--ok); color: #fff; animation: pop .35s var(--ease); }
   .hw.done .text { text-decoration: line-through; }
   .none { color: var(--muted); font-size: 15px; margin: 2px 4px 8px; }
-  .free { background: var(--card); border-radius: 16px; padding: 12px 16px; margin: 0 0 10px; color: var(--muted); font-size: 16px; box-shadow: var(--shadow); }
+  .free { background: var(--card); border-radius: 18px; padding: 12px 16px; margin: 0 0 10px; color: var(--muted); font-size: 16px; box-shadow: var(--shadow); }
 
   /* ---- оценки ---- */
   .mark { display: inline-flex; align-items: center; justify-content: center; min-width: 46px; height: 46px; padding: 0 8px; border-radius: 14px;
-    font-weight: 800; font-size: 24px; color: #fff; background: var(--mx); }
+    font-weight: 800; font-size: 23px; color: #fff; background: var(--mx); font-variant-numeric: tabular-nums;
+    box-shadow: 0 -2px 0 rgba(0,0,0,.12) inset, 0 1px 2px rgba(16,24,64,.12); }
   .m5 { background: var(--m5); } .m4 { background: var(--m4); } .m3 { background: var(--m3); } .m2 { background: var(--m2); } .m1 { background: var(--m1); }
-  .mark.sm { min-width: 36px; height: 36px; font-size: 19px; border-radius: 11px; }
+  .mark.sm { min-width: 36px; height: 36px; font-size: 18px; border-radius: 11px; }
+  .mark.xs { min-width: 26px; height: 26px; font-size: 14px; border-radius: 8px; padding: 0 5px; box-shadow: none; }
   .row { display: flex; align-items: center; gap: 14px; padding: 11px 0; border-top: 1px solid var(--line); }
   .row:first-child { border-top: 0; padding-top: 2px; }
   .row:last-child { padding-bottom: 2px; }
@@ -156,17 +188,19 @@ try { const s = JSON.parse(localStorage.getItem("settings") || "{}");
   .avg strong { display: block; color: var(--ink); font-size: 22px; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 
-  /* ---- расписание ---- */
+  /* ---- расписание и листание дней ---- */
   .plan-body { touch-action: pan-y; min-height: 55vh; }
-  .plan-body.from-right { animation: fromRight .22s ease-out; } .plan-body.from-left { animation: fromLeft .22s ease-out; }
-  @keyframes fromRight { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: none; } }
-  @keyframes fromLeft { from { opacity: 0; transform: translateX(-40px); } to { opacity: 1; transform: none; } }
+  .plan-body.from-right { animation: fromRight .26s var(--ease); } .plan-body.from-left { animation: fromLeft .26s var(--ease); }
+  @keyframes fromRight { from { opacity: 0; transform: translateX(44px); } to { opacity: 1; transform: none; } }
+  @keyframes fromLeft { from { opacity: 0; transform: translateX(-44px); } to { opacity: 1; transform: none; } }
   .swipehint { text-align: center; color: var(--muted); font-size: 13px; margin: 10px 0 0; }
-  .nav { display: flex; align-items: center; gap: 10px; margin: 6px 0 12px; }
-  .nav button { background: var(--card); border: 0; border-radius: 16px; min-width: 60px; min-height: 56px; font-size: 26px; box-shadow: var(--shadow); }
+  .nav { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; background: var(--card); border-radius: 22px; padding: 8px; box-shadow: var(--shadow); }
+  .nav button { background: var(--card-2); border: 0; border-radius: 16px; min-width: 52px; min-height: 52px; font-size: 26px; color: var(--brand); }
   .nav button:disabled { opacity: .35; }
-  .nav .ttl { flex: 1; text-align: center; font-weight: 800; font-size: 21px; line-height: 1.2; }
+  .nav .ttl { flex: 1; text-align: center; font-weight: 800; font-size: 20px; line-height: 1.2; background: transparent; padding: 4px; border-radius: 14px; min-width: 0; color: var(--ink); }
+  .nav .ttl:active { background: var(--card-2); }
   .nav .ttl small { display: block; font-weight: 500; color: var(--muted); font-size: 15px; }
+  .nav .ttl .totoday { display: inline-block; margin-top: 4px; font-size: 12px; font-weight: 700; color: var(--brand); background: var(--brand-soft); padding: 2px 10px; border-radius: 99px; }
   .lesson { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
   .lesson:first-child { border-top: 0; padding-top: 2px; }
   .lesson:last-child { padding-bottom: 2px; }
@@ -179,32 +213,32 @@ try { const s = JSON.parse(localStorage.getItem("settings") || "{}");
   .now-tag { font-size: 11px; font-weight: 800; background: var(--brand); color: #fff; padding: 2px 8px; border-radius: 99px; margin-left: 8px; vertical-align: 2px; }
   .lesson .ic { width: 44px; height: 44px; min-width: 44px; font-size: 23px; border-radius: 14px; }
 
-
-  /* ---- дни во вкладке «Домашка»: тот же фон, карточки и шрифты, что в «Расписании» ---- */
-  .day { background: var(--card); border-radius: 20px; padding: 14px 16px 8px; margin: 0 0 14px; box-shadow: var(--shadow); scroll-margin-top: 12px; }
-  .dtitle { font-size: 21px; font-weight: 800; line-height: 1.25; }
+  /* ---- дни во вкладке «Домашка» ---- */
+  .day { background: var(--card); border-radius: 22px; padding: 16px 16px 8px; margin: 0 0 14px; box-shadow: var(--shadow); scroll-margin-top: 12px; }
+  .dtitle { font-size: 21px; font-weight: 800; line-height: 1.25; letter-spacing: -.2px; }
+  .dtitle.tap:active { opacity: .7; }
   .rel { color: var(--brand); }
   .dprog { display: flex; align-items: center; gap: 8px; margin-top: 8px; color: var(--muted); font-size: 16px; }
-  .dprog b { color: var(--ink); font-size: 20px; }
-  .dpi { width: 32px; height: 32px; border-radius: 10px; background: var(--brand-soft); color: var(--brand); display: inline-flex; align-items: center; justify-content: center; font-size: 17px; }
-  .day .bar { margin: 12px 0 12px; height: 12px; }
-  .day.all-done .bar > i { background: linear-gradient(90deg, #35c46f, #1f9d55); }
-  .cheer { background: var(--ok-soft); color: var(--ok); font-weight: 700; border-radius: 14px; padding: 10px 14px; margin: 0 0 12px; font-size: 16px; }
+  .dprog b { color: var(--ink); font-size: 20px; font-variant-numeric: tabular-nums; }
+  .dpi { width: 30px; height: 30px; border-radius: 10px; background: var(--brand-soft); color: var(--brand); display: inline-flex; align-items: center; justify-content: center; font-size: 16px; }
+  .day .bar { margin: 12px 0 12px; height: 10px; }
+  .day.all-done .bar > i { background: linear-gradient(90deg, #35c46f, #13a057); }
+  .cheer { background: var(--ok-soft); color: var(--ok); font-weight: 700; border-radius: 14px; padding: 10px 14px; margin: 0 0 12px; font-size: 16px; animation: rise .4s var(--ease); }
   .lessons2 { display: block; }
-  .lesson2 { background: var(--soft); border-radius: 16px; padding: 6px 10px 10px; margin: 0 0 10px; }
+  .lesson2 { background: var(--card-2); border-radius: 18px; padding: 6px 10px 10px; margin: 0 0 10px; border-left: 4px solid var(--c, var(--brand)); }
   .lesson2.off { opacity: .55; }
   .lhead { display: flex; align-items: center; gap: 12px; padding: 8px 2px; cursor: pointer; }
   .lic { width: 44px; height: 44px; min-width: 44px; border-radius: 14px; background: var(--cbg, var(--brand-soft)); display: flex; align-items: center; justify-content: center; font-size: 23px; }
   .lt { flex: 1; min-width: 0; } .lt b { display: block; font-size: 18px; line-height: 1.25; } .lt span { color: var(--muted); font-size: 14px; }
-  .chev { color: var(--brand); font-size: 28px; line-height: 1; transition: transform .15s; padding: 0 4px; }
+  .chev { color: var(--brand); font-size: 26px; line-height: 1; transition: transform .2s var(--ease); padding: 0 4px; }
   .lesson2.open .chev { transform: rotate(90deg); }
   .ldetails { display: none; color: var(--muted); font-size: 15px; padding: 2px 4px 8px; }
-  .lesson2.open .ldetails { display: block; }
+  .lesson2.open .ldetails { display: block; animation: rise .25s var(--ease); }
   .strip { display: flex; align-items: center; gap: 12px; background: var(--strip-bg); border-radius: 14px; padding: 10px 10px 10px 14px; }
   .strip .stext { flex: 1; min-width: 0; }
   .strip .text { font-size: 18px; margin: 0; overflow-wrap: anywhere; line-height: 1.35; }
-  .strip .check { width: 46px; height: 46px; min-width: 46px; border-radius: 50%; border: 3px solid var(--strip-edge); background: var(--strip-check); font-size: 26px; }
-  .strip.done .check { background: var(--ok); border-color: var(--ok); color: #fff; }
+  .strip .check { width: 44px; height: 44px; min-width: 44px; border-radius: 50%; border: 2.5px solid var(--strip-edge); background: var(--strip-check); font-size: 24px; }
+  .strip.done .check { background: var(--ok); border-color: var(--ok); color: #fff; animation: pop .35s var(--ease); }
   .strip.done .text { text-decoration: line-through; opacity: .6; }
   .file { display: flex; align-items: center; gap: 10px; background: var(--card); border-radius: 14px; padding: 10px 12px; margin-top: 8px; color: var(--ink); text-decoration: none; flex-wrap: wrap; }
   .strip .text + .file { margin-top: 10px; }
@@ -213,18 +247,16 @@ try { const s = JSON.parse(localStorage.getItem("settings") || "{}");
   .file .fs { color: var(--brand); font-size: 14px; font-weight: 600; }
   .file.off .fs { color: var(--muted); font-weight: 500; }
   a.file:active { filter: brightness(.95); }
-  .pastbtn { display: block; width: 100%; margin: 0 0 14px; padding: 14px; border: 0; border-radius: 16px; background: var(--card); color: var(--brand); font-weight: 700; font-size: 16px; box-shadow: var(--shadow); }
+  .pastbtn { display: block; width: 100%; margin: 0 0 14px; padding: 14px; border: 0; border-radius: 18px; background: var(--card); color: var(--brand); font-weight: 700; font-size: 16px; box-shadow: var(--shadow); }
 
   /* ---- вход в Дневник.ру ---- */
   .setup { padding: 20px 18px; }
   .setup h2 { margin: 0 0 6px; font-size: 22px; }
   .setup p { margin: 6px 0 14px; color: var(--muted); font-size: 16px; }
   .setup label { display: block; font-weight: 700; font-size: 16px; margin: 12px 0 6px; }
-  .setup input { width: 100%; min-height: 54px; padding: 10px 14px; font-size: 20px; border-radius: 14px; border: 2px solid var(--line);
-    background: var(--bg); color: var(--ink); }
+  .setup input { width: 100%; min-height: 54px; padding: 10px 14px; font-size: 20px; border-radius: 16px; border: 2px solid var(--line); background: var(--card-2); color: var(--ink); }
   .setup input:focus { outline: none; border-color: var(--brand); }
-  .setup button.go { width: 100%; min-height: 58px; margin-top: 18px; border: 0; border-radius: 16px; background: var(--brand); color: var(--brand-ink);
-    font-size: 20px; font-weight: 800; }
+  .setup button.go { width: 100%; min-height: 58px; margin-top: 18px; border: 0; border-radius: 18px; background: linear-gradient(135deg, var(--brand), var(--brand-2)); color: #fff; font-size: 20px; font-weight: 800; }
   .setup button.go:disabled { opacity: .6; }
   .setup .msg { margin-top: 14px; padding: 12px 14px; border-radius: 14px; font-size: 16px; }
   .setup .msg.bad { background: var(--banner-bad-bg); color: var(--banner-bad-ink); }
@@ -232,43 +264,46 @@ try { const s = JSON.parse(localStorage.getItem("settings") || "{}");
   .setup details { margin-top: 16px; color: var(--muted); font-size: 15px; }
   .setup summary { cursor: pointer; font-weight: 700; color: var(--brand); }
   .setup .fine { margin: 14px 0 0; font-size: 13px; }
-  .banner button { margin-top: 8px; padding: 10px 16px; border: 0; border-radius: 12px; background: var(--brand); color: var(--brand-ink); font-weight: 700; font-size: 16px; }
+  .banner button { margin-top: 8px; padding: 10px 16px; border: 0; border-radius: 12px; background: var(--brand); color: #fff; font-weight: 700; font-size: 16px; }
   .linkbtn { display: block; margin: 18px auto 0; background: none; border: 0; color: var(--muted); font-size: 13px; text-decoration: underline; }
 
-  /* ---- оценки: переключатель «Сейчас / Итоги», годы, триместры ---- */
-  .seg { display: flex; gap: 6px; padding: 5px; background: var(--card); border-radius: 18px; box-shadow: var(--shadow); margin: 0 0 12px; }
-  .seg button { flex: 1; min-height: 48px; border: 0; border-radius: 14px; background: transparent; color: var(--muted); font-size: 17px; font-weight: 700; }
-  .seg button.on { background: var(--brand); color: var(--brand-ink); }
-  .seg.small button { min-height: 44px; font-size: 16px; }
+  /* ---- переключатели (как в iOS): «Сейчас / Годы / Посещаемость» и др. ---- */
+  .seg { display: flex; gap: 4px; padding: 4px; background: var(--bg-2); border-radius: 16px; margin: 0 0 14px; position: relative; }
+  .seg button { flex: 1; min-height: 44px; border: 0; border-radius: 13px; background: transparent; color: var(--muted); font-size: 16px; font-weight: 700; line-height: 1.15; }
+  .seg button.on { background: var(--card); color: var(--ink); box-shadow: 0 1px 2px rgba(16,24,64,.08), 0 4px 12px rgba(16,24,64,.08); }
+  .seg.small button { min-height: 40px; font-size: 15px; }
   .yearnav .ttl small { display: block; }
   .term-sub { margin: 0 0 8px 4px; color: var(--muted); font-size: 15px; }
   .fin { display: grid; grid-template-columns: minmax(100px, 2fr) repeat(var(--cols), minmax(36px, 1fr)); gap: 6px 3px; align-items: center; background: var(--card);
-    border-radius: 20px; padding: 12px 12px; box-shadow: var(--shadow); }
+    border-radius: 22px; padding: 12px 12px; box-shadow: var(--shadow); }
   .fin .h { color: var(--muted); font-size: 13px; font-weight: 700; text-align: center; padding-bottom: 4px; }
   .fin .h:first-child { text-align: left; }
   .fin .sn { font-weight: 700; font-size: 15px; line-height: 1.2; overflow-wrap: break-word; }
   .fin .c { text-align: center; }
-  .fin .c .mark { min-width: 34px; height: 34px; padding: 0 4px; font-size: 18px; }
+  .fin .c .mark { min-width: 34px; height: 34px; padding: 0 4px; font-size: 17px; }
   @media (max-width: 480px) { .who { font-size: 14px; } .fin { padding: 10px 8px; } }
   .fin .dash { color: var(--muted); }
   .fin .avgc { text-align: center; font-weight: 700; font-size: 15px; }
   .rowline { grid-column: 1 / -1; height: 1px; background: var(--line); margin: 2px 0; }
 
-  /* ---- окно подтверждения (смена входа) ---- */
-  .modal-back { position: fixed; inset: 0; z-index: 60; background: rgba(15,20,40,.62); display: flex; align-items: center; justify-content: center; padding: 18px; }
-  .modal { background: var(--card); color: var(--ink); border-radius: 24px; padding: 22px 20px 18px; max-width: 440px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,.45); }
+  /* ---- окна поверх страницы ---- */
+  .modal-back { position: fixed; inset: 0; z-index: 60; background: rgba(8,12,30,.55); display: flex; align-items: center; justify-content: center; padding: 18px;
+    animation: fade .2s ease-out; -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
+  .modal { background: var(--card); color: var(--ink); border-radius: 26px; padding: 22px 20px 18px; max-width: 440px; width: 100%; box-shadow: var(--shadow-lg); animation: modalIn .28s var(--ease); }
+  @keyframes modalIn { from { opacity: 0; transform: translateY(16px) scale(.97); } to { opacity: 1; transform: none; } }
   .modal h3 { margin: 0 0 8px; font-size: 21px; line-height: 1.25; }
   .modal p { margin: 0 0 18px; color: var(--muted); font-size: 17px; }
   .mbtns { display: grid; gap: 10px; }
-  .mbtns button { min-height: 56px; border: 0; border-radius: 16px; font-size: 18px; font-weight: 800; }
-  .mbtns .safe { background: var(--brand); color: var(--brand-ink); }
+  .mbtns button { min-height: 54px; border: 0; border-radius: 16px; font-size: 18px; font-weight: 800; }
+  .mbtns .safe { background: linear-gradient(135deg, var(--brand), var(--brand-2)); color: #fff; }
   .mbtns .danger { background: var(--banner-bad-bg); color: var(--banner-bad-ink); }
   .mbtns .danger:disabled { opacity: .55; }
+  .mbtns .alt { background: transparent; box-shadow: 0 0 0 2px var(--brand) inset; color: var(--brand); }
 
   /* ---- посещаемость ---- */
   .att { display: block; }
   .att-head { display: flex; align-items: center; gap: 14px; }
-  .att-pct { min-width: 84px; height: 84px; border-radius: 22px; background: var(--ok-soft); color: var(--ok); display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .att-pct { min-width: 84px; height: 84px; border-radius: 24px; background: var(--ok-soft); color: var(--ok); display: flex; flex-direction: column; align-items: center; justify-content: center; }
   .att-pct strong { font-size: 28px; line-height: 1; }
   .att-pct span { font-size: 11px; font-weight: 700; margin-top: 3px; }
   .att.warn .att-pct { background: var(--warn-bg); color: var(--warn-ink); }
@@ -282,15 +317,13 @@ try { const s = JSON.parse(localStorage.getItem("settings") || "{}");
   .att-day b { min-width: 92px; }
   .att-day span:last-child { color: var(--muted); flex: 1; }
   .att-terms { margin-top: 10px; display: grid; gap: 6px; }
-  .att-terms div { display: flex; justify-content: space-between; gap: 10px; font-size: 15px; padding: 8px 12px; border-radius: 12px; background: var(--bg); }
-
-  /* ---- экран «Посещаемость»: календарь по дням ---- */
+  .att-terms div { display: flex; justify-content: space-between; gap: 10px; font-size: 15px; padding: 8px 12px; border-radius: 12px; background: var(--card-2); }
   .legend { display: flex; flex-wrap: wrap; gap: 6px 12px; margin: 12px 4px 4px; font-size: 14px; color: var(--muted); }
   .legend span { display: inline-flex; align-items: center; gap: 6px; }
   .legend i { width: 14px; height: 14px; border-radius: 5px; display: inline-block; }
   .cal-month { margin: 14px 0 0; }
   .cal-title { font-weight: 800; font-size: 18px; margin: 0 4px 8px; text-transform: capitalize; }
-  .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; background: var(--card); border-radius: 20px; padding: 12px; box-shadow: var(--shadow); }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; background: var(--card); border-radius: 22px; padding: 12px; box-shadow: var(--shadow); }
   .cal-wd { text-align: center; color: var(--muted); font-size: 12px; font-weight: 700; padding-bottom: 2px; text-transform: uppercase; }
   .cal-cell { aspect-ratio: 1 / 1; min-width: 0; border: 2px solid transparent; border-radius: 12px; font: inherit; font-size: 16px; font-weight: 700;
     display: flex; align-items: center; justify-content: center; background: transparent; color: var(--muted); padding: 0; }
@@ -316,6 +349,7 @@ try { const s = JSON.parse(localStorage.getItem("settings") || "{}");
   .att-list .att-day { align-items: flex-start; }
   .att-list .att-day span:last-child b { display: block; color: var(--ink); font-size: 15px; }
   .seg.three button { font-size: 15px; padding: 0 4px; }
+  .att-sub { color: var(--muted); font-size: 14px; }
   /* ---- учителя ---- */
   .tline { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
   .teacher-row { display: flex; gap: 12px; align-items: center; padding: 11px 0; border-top: 1px solid var(--line); }
@@ -325,96 +359,337 @@ try { const s = JSON.parse(localStorage.getItem("settings") || "{}");
   .teacher-row b { display: block; font-size: 17px; }
   .teacher-row .tn { font-size: 16px; overflow-wrap: anywhere; }
   .teacher-row .tr { color: var(--muted); font-size: 13px; }
-  /* ---- выход и возврат входа ---- */
-  .setup button.restore { width: 100%; min-height: 54px; margin: 6px 0 4px; border: 2px solid var(--brand); border-radius: 16px; background: transparent; color: var(--brand); font-size: 18px; font-weight: 800; }
-  .empty { text-align: center; color: var(--muted); padding: 50px 10px; background: var(--card); border-radius: 22px; box-shadow: var(--shadow); }
-  .empty .em { font-size: 54px; display: block; margin-bottom: 6px; }
+  .setup button.restore { width: 100%; min-height: 54px; margin: 6px 0 4px; border: 0; box-shadow: 0 0 0 2px var(--brand) inset; border-radius: 16px; background: transparent; color: var(--brand); font-size: 18px; font-weight: 800; }
+  .empty { text-align: center; color: var(--muted); padding: 46px 16px; background: var(--card); border-radius: 24px; box-shadow: var(--shadow); }
+  .empty .em { font-size: 54px; display: block; margin-bottom: 6px; animation: pop .5s var(--ease); }
 
-  nav.tabs { position: fixed; left: 0; right: 0; bottom: 0; background: var(--card); box-shadow: 0 -4px 20px rgba(40,50,110,.1);
-    padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); z-index: 10; display: flex; gap: 6px; justify-content: center; }
-  nav.tabs button { flex: 1; max-width: 260px; border: 0; background: transparent; color: var(--muted); border-radius: 18px;
-    padding: 8px 4px; min-height: 66px; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 14px; font-weight: 600; }
-  nav.tabs button .e { font-size: 26px; line-height: 1; }
+  /* ---- нижняя панель: плавающая, «стеклянная» ---- */
+  nav.tabs { position: fixed; left: 12px; right: 12px; bottom: calc(10px + env(safe-area-inset-bottom)); z-index: 10; display: flex; gap: 4px; justify-content: center;
+    max-width: 520px; margin: 0 auto; padding: 6px; border-radius: 28px; background: var(--glass); box-shadow: var(--shadow-lg), 0 0 0 1px var(--glass-line) inset;
+    -webkit-backdrop-filter: saturate(1.6) blur(20px); backdrop-filter: saturate(1.6) blur(20px); }
+  nav.tabs button { flex: 1; border: 0; background: transparent; color: var(--muted); border-radius: 22px;
+    padding: 6px 4px; min-height: 60px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 12.5px; font-weight: 700; }
+  nav.tabs button .e { display: inline-flex; line-height: 1; }
+  nav.tabs button svg { width: 26px; height: 26px; }
   nav.tabs button.on { color: var(--brand); background: var(--brand-soft); }
+  nav.tabs button.on svg { animation: pop .35s var(--ease); }
 
-  /* ---- кнопка-шестерёнка и экран «Настройки» ---- */
-  .gear { background: rgba(255,255,255,.22); border: 0; border-radius: 14px; min-height: 42px; min-width: 42px; font-size: 22px; line-height: 1; padding: 0; }
-  .gear:active, .gear.on { background: rgba(255,255,255,.4); }
+  /* ---- экран «Настройки» ---- */
   .settings { max-width: 680px; margin: 0 auto; }
-  .settings .back { display: inline-flex; align-items: center; gap: 6px; background: var(--card); border: 0; border-radius: 14px; min-height: 48px; padding: 0 16px; font-size: 17px; font-weight: 700; color: var(--brand); box-shadow: var(--shadow); }
-  .settings h1 { font-size: 24px; margin: 14px 4px 4px; }
-  .set-card { background: var(--card); border-radius: 20px; padding: 14px 16px; margin: 12px 0 0; box-shadow: var(--shadow); }
+  .settings .back { display: inline-flex; align-items: center; gap: 6px; background: var(--card); border: 0; border-radius: 14px; min-height: 46px; padding: 0 16px; font-size: 17px; font-weight: 700; color: var(--brand); box-shadow: var(--shadow); }
+  .settings h1 { font-size: 26px; letter-spacing: -.3px; margin: 14px 4px 4px; }
+  .set-card { background: var(--card); border-radius: 22px; padding: 14px 16px; margin: 12px 0 0; box-shadow: var(--shadow); }
   .set-card h2 { margin: 0 0 4px; font-size: 18px; }
   .set-card .hint { margin: 0 0 10px; color: var(--muted); font-size: 14px; }
-  .set-card .seg { box-shadow: none; background: var(--soft); margin: 6px 0 0; }
-  .set-card .seg button { font-size: 16px; padding: 0 4px; }
+  .set-card .seg { margin: 6px 0 0; }
+  .set-card .seg button { font-size: 15px; padding: 0 4px; }
   .setrow { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
   .setrow:first-of-type { border-top: 0; }
   .setrow .lbl { flex: 1; min-width: 0; font-size: 17px; font-weight: 600; }
   .setrow .lbl small { display: block; color: var(--muted); font-size: 14px; font-weight: 400; }
-  .sw { position: relative; width: 62px; min-width: 62px; height: 36px; border-radius: 99px; border: 0; background: var(--line); transition: background .15s; }
-  .sw::after { content: ""; position: absolute; top: 4px; left: 4px; width: 28px; height: 28px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); transition: transform .15s; }
-  .sw[aria-checked="true"] { background: var(--brand); }
-  .sw[aria-checked="true"]::after { transform: translateX(26px); }
-  .setbtn { display: block; width: 100%; min-height: 52px; margin-top: 10px; border: 2px solid var(--line); border-radius: 14px; background: transparent; font-size: 17px; font-weight: 700; color: var(--ink); }
-  .setbtn.danger { border-color: var(--banner-bad-ink); color: var(--banner-bad-ink); }
+  .sw { position: relative; width: 58px; min-width: 58px; height: 34px; border-radius: 99px; border: 0; background: var(--line); transition: background .2s; }
+  .sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 28px; height: 28px; border-radius: 50%; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,.25); transition: transform .25s var(--ease); }
+  .sw[aria-checked="true"] { background: var(--ok); }
+  .sw[aria-checked="true"]::after { transform: translateX(24px); }
+  .setbtn { display: block; width: 100%; min-height: 52px; margin-top: 10px; border: 0; box-shadow: 0 0 0 2px var(--line) inset; border-radius: 16px; background: transparent; font-size: 17px; font-weight: 700; color: var(--ink); }
+  .setbtn.danger { box-shadow: 0 0 0 2px var(--banner-bad-ink) inset; color: var(--banner-bad-ink); }
   .setbtn.asked { background: var(--banner-bad-bg); }
   .set-card input.pw { display: block; width: 100%; min-height: 50px; margin-top: 8px; padding: 8px 14px; font-size: 18px; border-radius: 14px;
-    border: 2px solid var(--line); background: var(--bg); color: var(--ink); }
+    border: 2px solid var(--line); background: var(--card-2); color: var(--ink); }
   .set-card input.pw:focus { outline: none; border-color: var(--brand); }
   .set-card .msg { margin-top: 10px; padding: 10px 12px; border-radius: 12px; font-size: 15px; }
   .set-card .msg.bad { background: var(--banner-bad-bg); color: var(--banner-bad-ink); }
   .set-card .msg.good { background: var(--ok-soft); color: var(--ok); font-weight: 700; }
-  .setbtn.main { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); }
+  .setbtn.main { background: linear-gradient(135deg, var(--brand), var(--brand-2)); box-shadow: none; color: #fff; }
   body.locked nav.tabs, body.locked #gear, body.locked #refresh { display: none !important; }
-  /* ---- карточка оценки ---- */
-  .tap { cursor: pointer; -webkit-tap-highlight-color: transparent; }
-  .row.tap:active { opacity: .7; }
-  .mark.tap:active { transform: scale(.94); }
-  .tap:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; border-radius: 12px; }
-  .markmodal { max-width: 460px; padding: 20px 20px 18px; max-height: 92vh; overflow: auto; }
-  .mm-head { display: flex; align-items: flex-start; gap: 12px; }
-  .mm-head h3 { margin: 0; font-size: 24px; }
-  .mm-sub { color: var(--muted); font-size: 16px; margin-top: 2px; }
-  .mm-x { margin-left: auto; width: 44px; height: 44px; min-width: 44px; border: 0; border-radius: 50%; background: var(--soft); color: var(--muted); font-size: 20px; }
-  .mm-line { margin: 14px 0 0; font-size: 18px; line-height: 1.35; }
-  .mm-line .k { color: var(--muted); }
-  .mm-theme { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; margin-top: 2px; }
-  .mm-box { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0 14px; padding: 16px 10px; border-radius: 20px; background: var(--bg); text-align: center; }
-  .mm-box b { display: block; font-size: 16px; margin-bottom: 10px; }
-  .mm-big { display: inline-flex; align-items: center; justify-content: center; width: 84px; height: 84px; border-radius: 50%; font-size: 40px; font-weight: 800; color: #fff; background: var(--muted); }
-  .mm-avg { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 112px; height: 52px; padding: 0 14px; border-radius: 99px; font-size: 24px; font-weight: 800; color: #fff; background: var(--muted); margin-top: 16px; }
-  .mm-note { color: var(--muted); font-size: 13px; margin-top: 8px; }
-  .mm-big.m5, .mm-avg.m5 { background: var(--m5); }
-  .mm-big.m4, .mm-avg.m4 { background: var(--m4); }
-  .mm-big.m3, .mm-avg.m3 { background: var(--m3); }
-  .mm-big.m2, .mm-avg.m2 { background: var(--m2); }
-  .mm-big.m1, .mm-avg.m1 { background: var(--m1); }
-  .markmodal .mbtns { margin-top: 4px; }
-  .att-sub { color: var(--muted); font-size: 14px; }
-  /* ---- уведомления ---- */
   .qrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 6px 0 2px; font-size: 16px; }
-  .qrow input[type=time] { min-height: 44px; padding: 6px 10px; font-size: 18px; border-radius: 12px; border: 2px solid var(--line); background: var(--bg); color: var(--ink); }
+  .qrow input[type=time] { min-height: 44px; padding: 6px 10px; font-size: 18px; border-radius: 12px; border: 2px solid var(--line); background: var(--card-2); color: var(--ink); }
   .evrow { padding: 9px 0; border-top: 1px solid var(--line); font-size: 15px; }
   .evrow:first-of-type { border-top: 0; }
   .evrow b { display: block; font-size: 16px; }
   .evrow small { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
+
+  /* ---- нажатия ---- */
+  .tap { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .row.tap:active { opacity: .7; }
+  .mark.tap { transition: transform .12s var(--ease); }
+  .mark.tap:active { transform: scale(.9); }
+  .tap:focus-visible, button:focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; }
+
+  /* ---- карточка оценки: на телефоне — шторка снизу ---- */
+  .markmodal { max-width: 460px; padding: 22px 20px 16px; max-height: 92vh; overflow: auto; overscroll-behavior: contain; }
+  @media (max-width: 600px) {
+    .modal-back.sheet { align-items: flex-end; padding: 0; }
+    .modal-back.sheet .markmodal { border-radius: 28px 28px 0 0; max-width: none; max-height: 94vh; padding-bottom: calc(16px + env(safe-area-inset-bottom)); animation: sheetUp .34s var(--ease); }
+    .modal-back.sheet .markmodal::before { content: ""; display: block; width: 44px; height: 5px; border-radius: 99px; background: rgba(255,255,255,.6); position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 2; }
+  }
+  @keyframes sheetUp { from { transform: translateY(100%); } to { transform: none; } }
+  .markmodal { position: relative; }
+  .mm-head { display: flex; align-items: flex-start; gap: 12px; }
+  .mm-head h3 { margin: 0; font-size: 24px; }
+  .mm-sub { color: var(--muted); font-size: 16px; margin-top: 2px; }
+  .mm-x { margin-left: auto; width: 40px; height: 40px; min-width: 40px; border: 0; border-radius: 50%; background: var(--soft); color: var(--muted); font-size: 18px; }
+  .mm-line { margin: 10px 0 0; font-size: 17px; line-height: 1.35; }
+  .mm-line .k { color: var(--muted); }
+  .mm-theme { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .mm-box { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 10px; margin: 14px 0 12px; padding: 14px 10px; border-radius: 22px; background: var(--brand-soft); text-align: center; align-items: center; }
+  .mm-box.one { grid-template-columns: 1fr; }
+  .mm-box > div:last-child:not(:first-child) { text-align: left; }
+  .mm-box b { display: block; font-size: 15px; margin-bottom: 8px; }
+  .mm-big { display: inline-flex; align-items: center; justify-content: center; width: 72px; height: 72px; border-radius: 50%; font-size: 34px; font-weight: 800; color: #fff; background: var(--muted); }
+  .mm-avg { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 96px; height: 40px; padding: 0 14px; border-radius: 99px; font-size: 20px; font-weight: 800; color: #fff; background: var(--muted); }
+  .mm-note { color: var(--muted); font-size: 13px; margin: 8px 0 4px; }
+  .mm-big.m5, .mm-avg.m5 { background: var(--m5); } .mm-big.m4, .mm-avg.m4 { background: var(--m4); } .mm-big.m3, .mm-avg.m3 { background: var(--m3); }
+  .mm-big.m2, .mm-avg.m2 { background: var(--m2); } .mm-big.m1, .mm-avg.m1 { background: var(--m1); }
+  /* кольцо: как справился класс (доли оценок за эту работу) */
+  .donut { position: relative; width: 112px; height: 112px; margin: 0 auto; }
+  .donut svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .donut circle { fill: none; stroke-width: 10; stroke-linecap: butt; animation: draw .9s var(--ease) both; }
+  .donut circle.track { stroke: rgba(120,130,170,.18); animation: none; }
+  .donut .mid { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 40px; font-weight: 800; color: var(--ink); }
+  .donut .mid.m5 { color: var(--m5); background: none; } .donut .mid.m4 { color: var(--m4); background: none; } .donut .mid.m3 { color: var(--m3); background: none; }
+  .donut .mid.m2 { color: var(--m2); background: none; } .donut .mid.m1 { color: var(--m1); background: none; }
+  @keyframes draw { from { stroke-dasharray: 0 400; } }
+  .cmrow { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 15px; white-space: nowrap; }
+  .cmrow .pc { color: var(--muted); font-size: 13px; margin-left: auto; }
+  .mm-hero { margin: -22px -20px 6px; padding: 18px 64px 16px 20px; border-radius: 26px 26px 0 0; color: #fff; background: var(--mx); position: relative; overflow: hidden; }
+  .mm-hero.m5 { background: linear-gradient(135deg, #1f9e4f, #46c06b); } .mm-hero.m4 { background: linear-gradient(135deg, #5ea92f, #8fcd55); }
+  .mm-hero.m3 { background: linear-gradient(135deg, #ef8a22, #f7b546); } .mm-hero.m2 { background: linear-gradient(135deg, #e5552d, #f58a5a); }
+  .mm-hero.m1 { background: linear-gradient(135deg, #cf2836, #ef5b62); }
+  .mm-when { font-size: 14px; opacity: .92; margin-bottom: 6px; }
+  .mm-hrow h3 { color: #fff; margin: 0; font-size: 26px; letter-spacing: -.3px; }
+  .mm-hero .mm-sub { color: rgba(255,255,255,.88); }
+  .mm-ic { position: absolute; right: 52px; bottom: -6px; font-size: 64px; opacity: .22; }
+  .mm-hero .mm-x { position: absolute; top: 12px; right: 12px; margin: 0; background: rgba(0,0,0,.2); color: #fff; }
+  .plaques.in-modal { margin: 0 0 10px; }
+  .plaques.in-modal .plq { min-height: 54px; padding: 8px 10px; }
+  .plaques.in-modal .plq b { font-size: 13.5px; }
+  .mm-nav { display: flex; align-items: center; justify-content: center; gap: 18px; margin-top: 12px; color: var(--muted); font-size: 14px; }
+  .mm-nav button { width: 46px; height: 40px; border: 0; border-radius: 14px; background: var(--soft); color: var(--ink); font-size: 24px; line-height: 1; }
+  .mm-nav button:disabled { opacity: .35; }
+  .markmodal .mbtns { gap: 8px; margin-top: 4px; }
+  .markmodal .mbtns button { min-height: 50px; font-size: 17px; }
+  .markmodal.slide-l, .modal-back.sheet .markmodal.slide-l { animation: fromRight .24s var(--ease); }
+  .markmodal.slide-r, .modal-back.sheet .markmodal.slide-r { animation: fromLeft .24s var(--ease); }
+  .modal-back.nofade { animation: none; }
+  .scr .seg { background: rgba(255,255,255,.1); margin-top: 2px; }
+  .scr .seg button { color: rgba(255,255,255,.75); }
+  .scr .seg button.on { background: #fff; color: #1b2a7a; }
+
+  /* ---- рейтинг: плитки, медали, карточки предметов ---- */
+  .mark.dots { background: transparent; box-shadow: 0 0 0 2px rgba(255,255,255,.7) inset; color: #fff; font-size: 14px; }
+  .plaques { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; margin: 0 0 14px; }
+  .plq { display: flex; align-items: center; gap: 10px; min-width: 0; text-align: left; border: 0; border-radius: 22px; padding: 12px; color: #fff; position: relative; overflow: hidden;
+    background: linear-gradient(120deg, var(--navy-1) 0%, var(--navy-2) 100%); min-height: 74px; box-shadow: 0 10px 24px rgba(10,20,82,.25); }
+  .plq::after { content: ""; position: absolute; width: 90px; height: 90px; right: -30px; top: -40px; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.22), rgba(255,255,255,0) 70%); }
+  .plq b { font-weight: 600; line-height: 1.2; font-size: 14.5px; min-width: 0; }
+  .plq .ph { display: block; font-size: 11px; font-weight: 600; opacity: .75; margin-top: 3px; }
+  .plq .ph i { font-style: normal; font-weight: 800; }
+  .plq .ph .up { color: #6ef0a0; } .plq .ph .down { color: #ff9aa2; }
+  .dia, .cir { display: inline-flex; align-items: center; justify-content: center; min-width: 42px; height: 42px; font-weight: 800; font-size: 18px; flex: none; font-variant-numeric: tabular-nums; }
+  .dia { background: linear-gradient(160deg, #fff0a8, #f4c13d 55%, #e19a12); color: #5b3a00; clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); padding: 0 4px; }
+  .dia.s { background: linear-gradient(160deg, #ffffff, #c9d2ea 55%, #98a5c7); color: #2f3a58; }
+  .dia.b { background: linear-gradient(160deg, #ffd7b0, #e0965a 55%, #b8662c); color: #4a2306; }
+  .dia.sm, .cir.sm { min-width: 32px; height: 32px; font-size: 14px; }
+  .dw { position: relative; display: inline-flex; flex: none; }
+  .crown { position: absolute; top: -10px; right: -7px; font-size: 15px; font-style: normal; filter: drop-shadow(0 1px 1px rgba(0,0,0,.3)); }
+  .cir { border-radius: 50%; box-shadow: 0 0 0 2px #5aa0ff inset; background: rgba(60,120,255,.22); color: #fff; }
+  .cir.alt { box-shadow: 0 0 0 2px #e368de inset; background: rgba(227,104,222,.22); }
+  .cir.c2 { box-shadow: 0 0 0 2px #4fd1a5 inset; background: rgba(79,209,165,.2); } .cir.c3 { box-shadow: 0 0 0 2px #ffb547 inset; background: rgba(255,181,71,.2); }
+
+  .scard { border-radius: 26px; margin: 0 0 14px; overflow: hidden; color: #fff; cursor: pointer; position: relative; box-shadow: 0 10px 26px rgba(40,70,190,.18);
+    transition: transform .15s var(--ease); }
+  .scard:active { transform: scale(.985); }
+  .scard::before { content: attr(data-icon); position: absolute; right: 8px; top: -8px; font-size: 86px; opacity: .13; pointer-events: none; filter: grayscale(.3); }
+  .scard.good { background: linear-gradient(150deg, #7aa3fa 0%, #4b78ee 60%, #3f63e0 100%); }
+  .scard.mid { background: linear-gradient(150deg, #ffb04d 0%, #ff8a2e 55%, #f46f1f 100%); box-shadow: 0 10px 26px rgba(244,111,31,.25); }
+  .scard.bad { background: linear-gradient(150deg, #ff9b8f 0%, #f26457 55%, #e04a44 100%); box-shadow: 0 10px 26px rgba(224,74,68,.25); }
+  .sc-main { display: flex; gap: 10px; padding: 16px 16px 12px; align-items: flex-start; position: relative; }
+  .sc-left { flex: 1; min-width: 0; }
+  .sc-name { font-size: 25px; font-weight: 800; line-height: 1.15; letter-spacing: -.3px; overflow-wrap: anywhere; }
+  .scard .chips { margin-top: 12px; padding-bottom: 8px; }
+  .scard .mark { box-shadow: 0 0 0 2px rgba(255,255,255,.35) inset, 0 2px 6px rgba(0,0,0,.12); }
+  .avg2 { text-align: right; line-height: 1.1; }
+  .avg2 strong { display: block; font-size: 30px; font-weight: 800; letter-spacing: -.5px; }
+  .avg2 small { opacity: .75; font-size: 13px; }
+  .atile { min-width: 118px; max-width: 150px; border-radius: 18px; padding: 8px 10px 0; text-align: center; color: #fff; position: relative; overflow: hidden;
+    background: linear-gradient(160deg, #3f6be0, #7ea2f6); box-shadow: 0 0 0 2px rgba(255,255,255,.85) inset, 0 6px 16px rgba(0,0,0,.12); }
+  .atile.mid { background: linear-gradient(160deg, #ff8a1f, #f9c552); }
+  .atile.bad { background: linear-gradient(160deg, #e04b4b, #ff9a8b); }
+  .atile strong { display: block; font-size: 32px; line-height: 1.1; margin-top: 16px; letter-spacing: -.5px; }
+  .atile small { display: block; font-size: 12px; opacity: .85; line-height: 1.2; padding-bottom: 8px; }
+  .aadv { font-size: 13px; line-height: 1.6; margin: 0 0 8px; }
+  .alab { margin: 0 -10px; padding: 5px 4px; background: #fff; color: #2f63de; font-weight: 800; font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; }
+  .atile.mid .alab { color: #e5700f; } .atile.bad .alab { color: #d63d3d; }
+  .achg { position: absolute; top: 6px; right: 6px; font-size: 11.5px; font-weight: 800; padding: 1px 8px; border-radius: 99px; color: #fff; }
+  .achg.pos { background: #22a055; } .achg.neg { background: #d62d36; }
+  .sbar { display: flex; align-items: center; gap: 8px; padding: 10px 16px; background: rgba(0,0,40,.18); font-size: 14px; position: relative; }
+  .sbar .sl { line-height: 1.15; margin-right: 12px; opacity: .95; }
+  .streak { display: inline-flex; gap: 6px; padding: 5px; box-shadow: 0 0 0 3px rgba(255,255,255,.92) inset; border-radius: 17px; position: relative; margin-bottom: 14px; }
+  .streak em { position: absolute; left: 50%; bottom: -12px; transform: translateX(-50%); font-style: normal; font-size: 11px; font-weight: 800; background: #1f6bff; color: #fff; padding: 2px 10px; border-radius: 99px; white-space: nowrap;
+    box-shadow: 0 2px 6px rgba(0,0,0,.2); animation: pop .5s var(--ease) .3s both; }
+
+  /* ---- главная: лента «Последние оценки» ---- */
+  .strip-h { margin: 4px 4px 10px; justify-content: space-between; }
+  .strip-h small { font-size: 14px; color: var(--muted); font-weight: 600; }
+  .rstrip { display: flex; gap: 10px; overflow-x: auto; margin: 0 -16px 8px; padding: 2px 16px 14px; scroll-snap-type: x proximity; scroll-padding-left: 16px; scrollbar-width: none; overscroll-behavior-x: contain; touch-action: pan-x pan-y; }
+  .rstrip::-webkit-scrollbar { display: none; }
+  .rtile2 { flex: none; width: 116px; background: linear-gradient(160deg, #4a72f2, #2a46c2); color: #fff; border-radius: 22px; padding: 14px 8px 12px; text-align: center; scroll-snap-align: start; cursor: pointer;
+    box-shadow: 0 8px 18px rgba(42,70,194,.25); position: relative; overflow: hidden; transition: transform .15s var(--ease); }
+  .rtile2:active { transform: scale(.96); }
+  .rtile2::after { content: ""; position: absolute; width: 80px; height: 80px; right: -30px; top: -36px; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.25), rgba(255,255,255,0) 70%); }
+  .rtile2 .mark { width: 52px; height: 46px; font-size: 24px; margin: 0 auto 8px; display: flex; box-shadow: 0 0 0 2px rgba(255,255,255,.35) inset, 0 3px 8px rgba(0,0,0,.18); }
+  .rtile2 b { display: block; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rtile2 small { display: block; font-size: 10.5px; opacity: .8; letter-spacing: .03em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 3px; }
+  .rtile2 .fresh { position: absolute; top: 8px; right: 8px; width: 9px; height: 9px; border-radius: 50%; background: #ff5a7a; box-shadow: 0 0 0 2px rgba(255,255,255,.7); }
+
+  /* ---- экраны поверх страницы: заезжают справа, уезжают вправо ---- */
+  body.has-screen { overflow: hidden; }
+  #screen:empty { display: none; }
+  .scr { position: fixed; inset: 0; z-index: 50; overflow-y: auto; padding: 0 16px calc(44px + env(safe-area-inset-bottom)); color: #fff; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+  .scr.push { animation: scrIn .34s var(--ease); }
+  .scr-ghost { position: fixed; inset: 0; z-index: 55; pointer-events: none; animation: scrOut .26s ease-in forwards; overflow: hidden; }
+  @keyframes scrIn { from { transform: translateX(36%); opacity: .4; } to { transform: none; opacity: 1; } }
+  @keyframes scrOut { to { transform: translateX(70%); opacity: 0; } }
+  .scr > * { max-width: 640px; margin-left: auto; margin-right: auto; }
+  .scr.blue { background: linear-gradient(180deg, var(--night-1) 0%, var(--night-2) 42%, var(--night-3) 100%); }
+  .scr.subj.good { background: linear-gradient(180deg, #4b78ee, #7396f6); }
+  .scr.subj.mid { background: linear-gradient(180deg, #ff7a1a, #fbd35a); }
+  .scr.subj.bad { background: linear-gradient(180deg, #ee5a52, #ffa396); }
+  .scr.light { background: var(--bg); color: var(--ink); }
+  .scr-top { display: flex; align-items: center; gap: 10px; padding: calc(12px + env(safe-area-inset-top)) 0 12px; position: sticky; top: 0; z-index: 3; }
+  .scr-top::before { content: ""; position: absolute; inset: 0 -16px; z-index: -1; background: inherit; }
+  .scr.blue .scr-top { background: linear-gradient(180deg, rgba(13,74,216,.96), rgba(13,74,216,.85)); margin: 0 -16px; padding-left: 16px; padding-right: 16px; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+  .scr-back { width: 44px; height: 44px; min-width: 44px; border-radius: 50%; border: 0; background: rgba(0,0,0,.22); color: #fff; font-size: 28px; line-height: 1; padding: 0 0 4px; }
+  .scr.light .scr-back { background: var(--card); color: var(--ink); box-shadow: var(--shadow); }
+  .scr-title { flex: 1; text-align: center; padding-right: 44px; min-width: 0; }
+  .scr-title h1 { margin: 0; font-size: 22px; line-height: 1.2; letter-spacing: -.3px; overflow-wrap: anywhere; }
+  .scr-title small { opacity: .8; font-size: 14px; }
+  .scr-h { margin: 22px 2px 10px; font-size: 21px; letter-spacing: -.2px; }
+  .scr-note { margin: -4px 2px 12px; opacity: .8; font-size: 14px; }
+  .scr-card { background: rgba(255,255,255,.09); border-radius: 24px; padding: 14px 12px; margin: 0 0 14px; box-shadow: 0 0 0 1px rgba(255,255,255,.08) inset; animation: rise .4s var(--ease) both; }
+  .scr-card + .scr-card { animation-delay: .05s; }
+  .scr-card.light { background: var(--card); color: var(--ink); box-shadow: var(--shadow); }
+  .scr-card-h { display: flex; justify-content: space-between; align-items: center; padding: 0 6px 8px; font-size: 17px; }
+  .scr-card-h .r { font-weight: 600; opacity: .8; }
+  .lnk { border: 0; background: transparent; color: #6eb0ff; font-size: 16px; font-weight: 700; padding: 8px 6px; }
+  .scr-card.light .lnk, .scr.light .lnk { color: var(--brand); }
+  .lnk.center { display: block; width: 100%; text-align: center; margin-top: 4px; }
+  .brow { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 99px; margin: 2px 0; font-size: 16px; }
+  .brow.me { background: rgba(0,0,20,.5); box-shadow: 0 0 0 2px #4b8bff inset, 0 6px 18px rgba(0,0,0,.25); }
+  .scr-card.light .brow.me { background: var(--brand-soft); box-shadow: 0 0 0 2px var(--brand) inset; }
+  .scr-card.light .cir { color: #2f6ff0; } .scr-card.light .cir.alt { color: #b93cb4; } .scr-card.light .cir.c2 { color: #1d8f68; } .scr-card.light .cir.c3 { color: #c47a12; }
+  .atile strong, .avg2 strong { color: inherit; }
+  .bar2 { flex: 1 1 0; min-width: 72px; display: flex; align-items: center; justify-content: space-between; background: linear-gradient(90deg, #3d8af7, #5fa4ff); color: #fff; border-radius: 99px; padding: 0 0 0 14px; height: 34px; max-width: var(--w, 150px); font-weight: 600; font-size: 15px; }
+  .bar2.alt { background: linear-gradient(90deg, #d955d4, #ef84ea); }
+  .bar2.c2 { background: linear-gradient(90deg, #2fb98b, #5fd8ad); } .bar2.c3 { background: linear-gradient(90deg, #f0a032, #ffc066); }
+  .b-list .bar2 { max-width: none; flex: 0 1 var(--w, 60%); }
+  .av { width: 36px; height: 36px; border-radius: 50%; background: #fff; display: inline-flex; align-items: center; justify-content: center; font-style: normal; font-size: 21px; margin: -1px; flex: none; box-shadow: 0 0 0 2px rgba(255,255,255,.7); }
+  .av.own { background: linear-gradient(160deg, #ffe08a, #ffc24a); color: #5b3a00; font-weight: 800; font-size: 17px; }
+  .bm { font-weight: 800; flex: none; font-variant-numeric: tabular-nums; }
+  .dl { flex: none; font-size: 12px; font-weight: 700; padding: 1px 7px; border-radius: 99px; box-shadow: 0 0 0 1.5px currentColor inset; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .dl.pos { color: #3ccf7b; } .dl.neg { color: #ff7e88; }
+  .scr-card.light .dl.pos, .scr.light .dl.pos { color: #16984f; } .scr-card.light .dl.neg, .scr.light .dl.neg { color: #d12f3a; }
+  .dl.solid { color: #fff !important; box-shadow: none; } .dl.pos.solid { background: #22a055; } .dl.neg.solid { background: #d62d36; }
+  .rk { margin-left: auto; flex: none; display: inline-flex; align-items: center; gap: 4px; font-size: 11px; opacity: .9; line-height: 1.1; }
+  .brow .rk small { font-size: 11px; }
+  .srow { display: flex; align-items: center; gap: 12px; width: 100%; border: 0; background: transparent; color: inherit; text-align: left; padding: 12px 4px; border-top: 1px solid rgba(255,255,255,.12); font-size: 18px; }
+  .srow:first-of-type { border-top: 0; }
+  .srow .sn { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .srow .sv { font-weight: 800; font-variant-numeric: tabular-nums; }
+  .chv { color: #6eb0ff; font-size: 26px; line-height: 1; }
+  .b-line { text-align: center; font-size: 18px; line-height: 1.45; padding: 6px 12px 14px; animation: rise .4s var(--ease) both; }
+  .b-line b { font-size: 21px; display: block; margin-bottom: 2px; }
+  .b-cols { display: flex; align-items: center; gap: 12px; padding: 0 6px 8px; font-size: 14px; opacity: .9; }
+  .b-cols span { flex: 1; }
+  .b-cols span:first-child { max-width: 40%; }
+  .tgl { margin-left: auto; border: 0; border-radius: 16px; background: linear-gradient(135deg, #2f7bff, #1f5ae6); color: #fff; font-size: 15px; font-weight: 700; padding: 11px 20px; box-shadow: 0 6px 16px rgba(31,90,230,.35); }
+  .b-list .brow { padding: 7px 6px; animation: rise .35s var(--ease) both; }
+  .b-list .brow:nth-child(n+12) { animation: none; }
+  .sj-avg { display: flex; gap: 14px; align-items: center; }
+  .sj-avg .atile { min-width: 112px; padding-bottom: 8px; box-shadow: 0 6px 16px rgba(0,0,0,.12); }
+  .sj-avg .atile strong { margin-top: 18px; }
+  .sj-adv { flex: 1; font-size: 19px; line-height: 1.5; }
+  .sj-adv .mark { vertical-align: middle; margin: 0 2px; }
+  .scr-card.light .chips { margin-top: 16px; }
+  .share { display: block; width: 100%; margin: 24px auto 0; min-height: 58px; border: 0; border-radius: 20px; background: #fff; color: #1f5ae6; font-size: 19px; font-weight: 800; box-shadow: 0 10px 24px rgba(0,0,0,.12); }
+  .ls-head { padding: 4px 2px 12px; }
+  .ls-head small { color: var(--muted); font-size: 14px; line-height: 1.5; letter-spacing: .02em; }
+  .ls-n { font-size: 13px; font-weight: 800; margin-top: 6px; color: var(--brand); letter-spacing: .04em; }
+  .ls-head h2 { margin: 6px 0 4px; font-size: 30px; letter-spacing: -.5px; }
+  .ls-theme { color: var(--muted); font-size: 19px; line-height: 1.35; overflow-wrap: anywhere; }
+  .ls-h { margin: 20px 2px 8px; font-size: 20px; }
+  .ls-box { background: var(--card); border-radius: 22px; padding: 8px 14px; box-shadow: var(--shadow); animation: rise .35s var(--ease) both; }
+  .ls-mark { display: flex; align-items: center; gap: 14px; padding: 8px 0; font-size: 17px; }
+  .ls-hw { display: flex; align-items: center; gap: 12px; padding: 10px 0; font-size: 18px; overflow-wrap: anywhere; }
+  .ls-hw span { flex: 1; } .ls-hw.done span { text-decoration: line-through; color: var(--muted); }
+  .ls-hw .check { width: 44px; height: 44px; min-width: 44px; font-size: 22px; }
+  .ls-hw .check.on { background: var(--ok); border-color: var(--ok); color: #fff; animation: pop .35s var(--ease); }
+  .ls-t { display: flex; align-items: center; gap: 12px; padding: 8px 0; font-size: 17px; }
+  .ls-t i { width: 44px; height: 44px; border-radius: 50%; background: var(--brand-soft); color: var(--brand); display: inline-flex; align-items: center; justify-content: center; font-style: normal; font-weight: 800; }
+
+  /* ---- история мест и график ---- */
+  .hist { display: flex; gap: 8px; flex-wrap: wrap; margin: 2px 0 14px; }
+  .hist span { background: rgba(255,255,255,.1); border-radius: 12px; padding: 6px 10px; font-size: 13px; }
+  .hist b { font-size: 15px; margin-left: 4px; }
+  .spark { width: 100%; height: 110px; display: block; }
+  .spark .ln { fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; animation: drawLine 1.1s var(--ease) both; stroke-dasharray: 1000; }
+  .spark .ln.c { stroke: #ffd166; } .spark .ln.p { stroke: #7fb6ff; }
+  .spark .dot { stroke: #0a1452; stroke-width: 2; animation: pop .4s var(--ease) .9s both; transform-box: fill-box; transform-origin: center; }
+  .spark .dot.c { fill: #ffd166; } .spark .dot.p { fill: #7fb6ff; }
+  .spark text { fill: #fff; font-size: 12px; font-weight: 800; }
+  @keyframes drawLine { from { stroke-dashoffset: 1000; } to { stroke-dashoffset: 0; } }
+  .legend2 { display: flex; gap: 14px; font-size: 13px; opacity: .85; padding: 0 6px 6px; }
+  .legend2 i { display: inline-block; width: 18px; height: 4px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+
+  /* ---- рейтинг классов (считаем по среднему баллу учеников) ---- */
+  .crow { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; background: rgba(255,255,255,.06); color: inherit; text-align: left; border-radius: 20px; padding: 10px 12px; margin: 0 0 8px; }
+  .crow .cn { flex: 0 0 34%; font-weight: 700; font-size: 16px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .crow .cls { flex: 1; display: flex; gap: 8px; align-items: center; justify-content: flex-start; min-width: 0; }
+  .cb { position: relative; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 50%; font-size: 13px; font-weight: 800; color: #fff; flex: none;
+    background: linear-gradient(160deg, #6a5cf0, #4936c9); box-shadow: 0 0 0 2px rgba(255,255,255,.25) inset; }
+  .cb.mine { background: linear-gradient(160deg, #4c9bff, #2f6ff0); box-shadow: 0 0 0 3px #ffd166, 0 0 16px rgba(255,209,102,.5); width: 50px; height: 50px; }
+  .cb small { font-size: 9px; font-weight: 700; opacity: .9; line-height: 1; }
+  .cb .md { position: absolute; bottom: -6px; right: -6px; width: 20px; height: 20px; border-radius: 50%; font-size: 11px; display: flex; align-items: center; justify-content: center; color: #4a2f00; font-weight: 800; box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+  .md.g { background: linear-gradient(160deg, #ffe27a, #e8a514); } .md.s { background: linear-gradient(160deg, #fff, #aeb9d8); color: #2f3a58; } .md.b { background: linear-gradient(160deg, #ffc89a, #c87335); }
+  .cb .mv { position: absolute; top: -6px; left: -6px; font-size: 10px; padding: 0 5px; border-radius: 99px; font-weight: 800; color: #fff; }
+  .cb .mv.up { background: #22a055; } .cb .mv.down { background: #d62d36; }
+  .podium { display: flex; align-items: flex-end; justify-content: center; gap: 10px; padding: 8px 4px 0; }
+  .podium > div { flex: 1; max-width: 110px; text-align: center; }
+  .podium .step { border-radius: 14px 14px 6px 6px; background: rgba(255,255,255,.14); margin-top: 6px; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 800; }
+  .podium .p1 .step { height: 78px; background: linear-gradient(180deg, rgba(255,214,102,.55), rgba(255,214,102,.15)); }
+  .podium .p2 .step { height: 58px; background: linear-gradient(180deg, rgba(220,228,255,.45), rgba(220,228,255,.1)); }
+  .podium .p3 .step { height: 44px; background: linear-gradient(180deg, rgba(255,184,130,.45), rgba(255,184,130,.12)); }
+  .podium .pav { width: 48px; height: 48px; margin: 0 auto; border-radius: 50%; background: #fff; display: flex; align-items: center; justify-content: center; font-size: 28px; box-shadow: 0 0 0 3px rgba(255,255,255,.4); }
+  .podium .pav.own { background: linear-gradient(160deg, #ffe08a, #ffc24a); color: #5b3a00; font-size: 20px; font-weight: 800; }
+  .podium small { display: block; font-size: 13px; font-weight: 700; margin-top: 4px; }
+  .note-calc { font-size: 13px; opacity: .75; padding: 4px 6px 0; }
+
+  #toast { position: fixed; left: 50%; bottom: calc(100px + env(safe-area-inset-bottom)); transform: translate(-50%, 10px); z-index: 80; background: rgba(20,24,44,.94); color: #fff; padding: 11px 18px; border-radius: 99px; font-size: 15px; opacity: 0; pointer-events: none; transition: opacity .2s, transform .25s var(--ease); max-width: 90vw; text-align: center; }
+  #toast.on { opacity: 1; transform: translate(-50%, 0); }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; animation-delay: 0s !important; transition-duration: .01ms !important; }
+  }
 </style>
 </head>
 <body>
 <header>
   <div class="head-in">
-    <div class="grow"><h1 class="hello" id="hello">Мой дневник</h1><div class="meta"><div class="who" id="who"></div><div class="sub" id="updated"></div></div></div>
-    <button class="refresh" id="refresh" aria-label="Обновить"><span id="ricon">⟳</span><span class="rlabel"> Обновить</span></button>
-    <button class="gear" id="gear" aria-label="Настройки" title="Настройки">⚙</button>
+    <div class="avatar" id="avatar" aria-hidden="true">📘</div>
+    <div class="grow"><h1 class="hello" id="hello">Мой дневник</h1><div class="meta"><span class="who" id="who"></span><span class="sub" id="updated"></span></div></div>
+    <button class="refresh" id="refresh" aria-label="Обновить" title="Обновить"><span id="ricon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg></span><span class="rlabel"> Обновить</span></button>
+    <button class="gear" id="gear" aria-label="Настройки" title="Настройки"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
   </div>
 </header>
 <main id="main"></main>
+<div id="screen"></div>
 <div id="modal"></div>
+<div id="toast" role="status" aria-live="polite"></div>
 <nav class="tabs">
-  <button data-tab="hw" class="on"><span class="e">📝</span>Домашка</button>
-  <button data-tab="marks"><span class="e">⭐</span>Оценки</button>
-  <button data-tab="plan"><span class="e">🗓</span>Расписание</button>
+  <button data-tab="hw" class="on"><span class="e"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5"/><path d="M9 8h7M9 12h5"/></svg></span>Домашка</button>
+  <button data-tab="marks"><span class="e"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20V12"/><path d="M10 20V7"/><path d="M15 20v-9"/><path d="M20 20V4"/></svg></span>Оценки</button>
+  <button data-tab="plan"><span class="e"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16.5" rx="3"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/><path d="M7.5 14h2M11 14h2M14.5 14h2M7.5 17.5h2M11 17.5h2"/></svg></span>Расписание</button>
 </nav>
 
 <script>
@@ -447,7 +722,7 @@ const store = {
 // ---------- Настройки (хранятся на самом устройстве, у каждого телефона свои) ----------
 const DEFAULTS = { theme: "auto", scale: 1, swipe: true, hwMode: "feed", showPast: false, teachers: true, startTab: "hw" };
 const CHOICES = {
-  theme: ["auto", "light", "dark"], scale: [0.9, 1, 1.1, 1.2], hwMode: ["feed", "pages"], startTab: ["hw", "marks", "plan"],
+  theme: ["auto", "light", "dark"], scale: [0.8, 0.9, 1, 1.1, 1.2], hwMode: ["feed", "pages"], startTab: ["hw", "marks", "plan"],
 };
 function loadSettings() {
   let raw = store.get("settings", {});
@@ -625,16 +900,19 @@ async function finishLogout() {                      // второе подтв�
   if (!r.ok) { confirmError = r.message || "Не получилось."; return render(); }
   confirmStep = 0;
   try { localStorage.removeItem("cache"); localStorage.removeItem("done"); } catch {}      // на устройстве ничего от прежнего аккаунта не остаётся
-  showSetup = false; showSettings = false; marksView = "now"; yearIdx = 0; attDay = null; planView = "days";
+  showSetup = false; showSettings = false; marksView = "now"; yearIdx = 0; attDay = null; planView = "days"; screens = []; markKey = null;
   setupMsg = { ok: true, text: r.message || "Вы вышли из аккаунта." };
   data = null;
   await load();
   window.scrollTo(0, 0);
 }
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") { if (markKey) { markKey = null; showMarkModal(); } else if (confirmStep && !confirmBusy) closeConfirm(); return; }
+  if (e.key === "Escape") { if (markKey) { closeMark(); } else if (confirmStep && !confirmBusy) closeConfirm(); else if (screens.length) backScreen(); return; }
+  if (markKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) { markStep(e.key === "ArrowRight" ? 1 : -1); return; }
   const mk = e.target.closest?.("[data-mark]");                                    // оценки — кнопки: открываются и с клавиатуры
-  if (mk && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); markKey = mk.dataset.mark; showMarkModal(); }
+  if (mk && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); openMark(mk.dataset.mark, mk); return; }
+  const rb = e.target.closest?.("[role=button][data-open-subject], [role=button][data-open-rating], [role=button][data-today]");     // плитки предметов и рейтинга: тоже с клавиатуры
+  if (rb && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); rb.click(); }
 });
 
 function statusBanner() {
@@ -654,19 +932,23 @@ function greeting() {
   return name ? `${hi}, ${name}!` : `${hi}!`;
 }
 
+let enterAnim = true;                               // карточки появляются по очереди только при входе во вкладку, не при каждой перерисовке
 function render() {
   document.body.classList.toggle("locked", locked);
   if (locked) {                                    // сервер просит пароль семьи: ничего из дневника не показываем
     $("#hello").textContent = "Мой дневник"; $("#who").textContent = ""; $("#updated").textContent = ""; $("#modal").innerHTML = "";
     $("#main").innerHTML = lockCard();
+    screens = []; renderScreen();
     return;
   }
   $("#hello").textContent = greeting();
   const st = data?.student;
+  $("#avatar").textContent = (config.name || st?.name || "").slice(0, 1).toUpperCase() || "📘";
   $("#who").textContent = st?.name ? `${st.name}${st.school ? ` (${st.school})` : ""}` : "";
   if (data?.updatedAt) {
     const d = new Date(data.updatedAt);
-    $("#updated").textContent = `Обновлено ${d.getDate()} ${MONTHS[d.getMonth()]} в ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    const r = rel(iso(d)), when = r === "Сегодня" ? "сегодня" : r === "Вчера" ? "вчера" : `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+    $("#updated").textContent = `Обновлено ${when} в ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
   } else $("#updated").textContent = "Данных пока нет";
   $("#refresh").style.display = window.__DATA__ ? "none" : "";
   $("#gear").classList.toggle("on", showSettings);
@@ -681,6 +963,7 @@ function render() {
   if (showSettings) {
     $("#main").innerHTML = settingsView();
     if (!pushState.loaded && !pushState.loading) setTimeout(loadPush, 0);          // состояние уведомлений узнаём один раз, когда открыли настройки
+    renderScreen();
     return;
   }
   let body;
@@ -695,9 +978,11 @@ function render() {
     body = `<div class="empty"><span class="em">⏳</span>Данные ещё загружаются.<br>Подожди пару минут и нажми «Обновить».</div>`;
   } else {
     const [main, aside] = tab === "hw" ? viewHw() : tab === "marks" ? viewMarks() : viewPlan();
-    body = `<div class="grid ${aside ? "two" : ""}"><div>${main}</div>${aside ? `<div class="aside">${aside}</div>` : ""}</div>`;
+    body = `<div class="grid ${aside ? "two" : ""}"><div class="${enterAnim ? "enter" : ""}">${main}</div>${aside ? `<div class="aside">${aside}</div>` : ""}</div>`;
   }
+  enterAnim = false;
   $("#main").innerHTML = (showSetup && !setupWait ? "" : statusBanner()) + body + (data?.version ? `<div class="ver">Мой дневник · версия ${esc(data.version)}</div>` : "");
+  renderScreen();
 }
 
 // ---------- Уведомления (веб-пуш) ----------
@@ -922,7 +1207,7 @@ function settingsView() {
   return `<div class="settings"><button class="back" data-settings-close>‹ Назад</button><h1>Настройки</h1>
     <div class="set-card"><h2>Тема оформления</h2><p class="hint">«Авто» — как включено на самом телефоне или планшете.</p>${setSeg("theme", [["auto", "Авто"], ["light", "Светлая"], ["dark", "Тёмная"]])}</div>
     <div class="set-card"><h2>Размер текста и кнопок</h2><p class="hint">Один размер на всех экранах: домашка, оценки и расписание.</p>
-      ${setSeg("scale", [[0.9, "Мелко"], [1, "Обычно"], [1.1, "Крупно"], [1.2, "Очень"]])}</div>
+      ${setSeg("scale", [[0.8, "Мини"], [0.9, "Мелко"], [1, "Обычно"], [1.1, "Крупно"], [1.2, "Очень"]])}</div>
     <div class="set-card"><h2>Листание дней</h2>
       ${setSwitch("swipe", "Листать дни свайпом", "Палец влево и вправо. Стрелки ‹ › работают всегда.")}</div>
     <div class="set-card"><h2>Домашка</h2><p class="hint">Как показывать задания.</p>
@@ -948,7 +1233,7 @@ function focusDate() {
   if (days.some((d) => d.date === today)) return today;   // сегодняшний день всегда виден, если сегодня есть уроки
   return days.find((d) => d.date > today)?.date ?? null;
 }
-const cls = (v) => ({ 5: "m5", 4: "m4", 3: "m3", 2: "m2", 1: "m1" }[String(v).trim()] ?? "");
+const cls = (v) => ({ 5: "m5", 4: "m4", 3: "m3", 2: "m2", 1: "m1", "ЗЧ": "m5", "ЗАЧ": "m5" }[String(v).trim().toUpperCase()] ?? "");
 const markKeyOf = (date, li, mi) => `${date}|${li}|${mi}`;     // где искать оценку: день, номер урока в дне, номер оценки в уроке
 // Оценка в строке урока (Домашка, Расписание): нажатие открывает карточку оценки
 const tapMark = (date, li, mi, m, subject) => `<span class="mark sm tap ${cls(m.value)}" role="button" tabindex="0" data-mark="${esc(markKeyOf(date, li, mi))}" aria-label="Оценка ${esc(m.value)}, ${esc(subject)}: подробности">${esc(m.value)}</span>`;
@@ -957,16 +1242,6 @@ function allMarks() {
   for (const d of data.days) d.lessons.forEach((l, li) => l.marks.forEach((m, mi) =>
     out.push({ key: markKeyOf(d.date, li, mi), date: d.date, subject: l.subject, value: String(m.value ?? "").trim(), work: m.work, created: m.created || d.date })));
   return out.sort((a, b) => (b.created > a.created ? 1 : -1));
-}
-function recentMarksCard(limit = 6) {
-  const marks = allMarks().slice(0, limit);
-  if (!marks.length) return "";
-  const today = parse(todayIso());
-  return `<h2>Последние оценки</h2><div class="card">${marks.map((m) => {
-    const fresh = (today - parse(m.date)) / 864e5 <= 1;
-    return `<div class="row tap" role="button" tabindex="0" data-mark="${esc(m.key)}" aria-label="Оценка ${esc(m.value)}, ${esc(m.subject)}: подробности"><span class="mark ${cls(m.value)}">${esc(m.value)}</span>
-      <div class="t"><b>${esc(m.subject)}${fresh ? '<span class="new">новая</span>' : ""}</b><span>${dayName(m.date)} · ${esc(m.work || "")}</span></div></div>`;
-  }).join("")}</div>`;
 }
 function dayScheduleCard(date, title) {
   const day = data.days.find((d) => d.date === date);
@@ -1019,7 +1294,7 @@ function dayCard(d, done, focusId, paged = false) {
       ${strip}</div>`;
   }).join("");
   return `<section class="day ${allDone ? "all-done" : ""}" ${d.date === focusId ? 'id="focus-day"' : ""}>
-    ${paged ? "" : `<div class="dtitle">${esc(WD[d.weekday] ?? d.weekday)}, ${dayName(d.date)}${rr ? ` <span class="rel">${rr}</span>` : ""}</div>`}
+    ${paged ? "" : `<div class="dtitle ${d.date === focusId ? "" : "tap"}" ${d.date === focusId ? "" : 'data-today role="button" tabindex="0" aria-label="Перейти к сегодняшнему дню"'}>${esc(WD[d.weekday] ?? d.weekday)}, ${dayName(d.date)}${rr ? ` <span class="rel">${rr}</span>` : ""}</div>`}
     <div class="dprog"><span class="dpi">☑</span>${total
       ? `<b>${dn}/${total}</b> <span>${label}</span>` : `<span>Домашки нет 🎉</span>`}</div>
     ${total ? `<div class="bar"><i style="width:${Math.round((dn / total) * 100)}%"></i></div>` : ""}
@@ -1028,11 +1303,22 @@ function dayCard(d, done, focusId, paged = false) {
 }
 
 // Стрелки и заголовок дня: одинаковые в «Домашке» (по одному дню) и в «Расписании»
-function pagerHtml(dates, date) {
+function pagerHtml(dates, date, target) {
   const i = dates.indexOf(date), day = data.days.find((d) => d.date === date), r = rel(date);
+  const away = target && target !== date;
   return `<div class="nav"><button data-nav="-1" ${i === 0 ? "disabled" : ""} aria-label="Раньше">‹</button>
-    <div class="ttl">${r ? `<span class="rel">${r}</span>, ` : ""}${esc(WD[day.weekday] ?? "")}<small>${dayName(day.date)}</small></div>
+    <button class="ttl" data-today aria-label="${away ? "Вернуться к сегодняшнему дню" : "Сегодняшний день"}">${r ? `<span class="rel">${r}</span>, ` : ""}${esc(WD[day.weekday] ?? "")}<small>${dayName(day.date)}</small>${away ? `<span class="totoday">↺ к сегодня</span>` : ""}</button>
     <button data-nav="1" ${i === dates.length - 1 ? "disabled" : ""} aria-label="Позже">›</button></div>`;
+}
+const planTarget = (dates) => dates.find((d) => d >= todayIso()) ?? dates[dates.length - 1];
+function goToday() {                                   // нажали на дату: возвращаемся к сегодняшнему (или ближайшему учебному) дню
+  if (tab === "plan") {
+    const dates = data.days.filter((d) => d.lessons.length).map((d) => d.date), t = planTarget(dates);
+    if (t && t !== planDate) { pageAnim = t > planDate ? "from-right" : "from-left"; planDate = t; render(); }
+  } else if (settings.hwMode === "pages") {
+    const dates = schoolDays().map((d) => d.date), t = focusDate() ?? dates[dates.length - 1];
+    if (t && t !== hwDate) { pageAnim = t > hwDate ? "from-right" : "from-left"; hwDate = t; render(); }
+  } else document.getElementById("focus-day")?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 const swipeHint = () => (settings.swipe ? `<div class="swipehint">Листай дни пальцем влево и вправо ↔</div>` : "");
 
@@ -1043,56 +1329,449 @@ function viewHw() {
   if (settings.hwMode === "pages" && all.length) {                   // по одному дню, как в расписании
     const dates = all.map((d) => d.date);
     if (!hwDate || !dates.includes(hwDate)) hwDate = focus ?? dates[dates.length - 1];
-    const out = pagerHtml(dates, hwDate) + `<div class="plan-body ${pageAnim}" id="plan-body">${dayCard(all.find((d) => d.date === hwDate), done, focus, true)}</div>` + swipeHint();
+    const out = pagerHtml(dates, hwDate, focus ?? dates[dates.length - 1]) + `<div class="plan-body ${pageAnim}" id="plan-body">${dayCard(all.find((d) => d.date === hwDate), done, focus, true)}</div>` + swipeHint();
     pageAnim = "";
-    return [out, recentMarksCard(5)];
+    return [recentStrip() + out, ""];
   }
-  if (!focus) return [`<div class="empty"><span class="em">🎉</span>Ближайших уроков нет. Отдыхай!</div>`, ""];
+  if (!focus) return [recentStrip() + `<div class="empty"><span class="em">🎉</span>Ближайших уроков нет. Отдыхай!</div>`, ""];
   const past = all.filter((d) => d.date < focus).slice(-5), upcoming = all.filter((d) => d.date >= focus).slice(0, 6);
   let out = "";
   if (past.length) out += `<button class="pastbtn" data-past>${showPast ? "Скрыть прошлые дни ↓" : "↑ Показать прошлые дни"}</button>`;
   if (showPast) out += past.map((d) => dayCard(d, done, focus)).join("");
   out += upcoming.map((d) => dayCard(d, done, focus)).join("");
-  return [out, recentMarksCard(5)];
+  return [recentStrip() + out, ""];
 }
 
-// ---------- Карточка оценки: за что поставлена, учитель, тема урока, средний балл по предмету ----------
-let markKey = null;
+// ---------- Рейтинг и подробности оценок: данные, которые Дневник.ру сам показывает ученику (роутер их не угадывает и закрытое подпиской не берёт) ----------
+const shortDate = (s) => { const d = parse(String(s).slice(0, 10)); return `${d.getDate()} ${MONTHS[d.getMonth()]}`; };       // месяцы пишем полностью, как везде
+const ANIMALS = ["🐻", "🦊", "🐼", "🐯", "🦁", "🐸", "🐵", "🐰", "🦓", "🐨", "🐮", "🐷", "🦌", "🐙", "🐘", "🦝", "🦒", "🐹", "🐱", "🐶", "🦔", "🐺"];
+const avatarOf = (a) => (a ? ANIMALS[a % ANIMALS.length] : "🙂");
+const ratingData = () => data?.rating || null;
+const ratingFor = (name) => (ratingData()?.subjects || []).find((x) => x.name === name) || null;
+const fmtChange = (c) => String(c || "").replace(/^([+-])/, "$1 ");
+const downChange = (c) => String(c || "").startsWith("-");
+const MOOD = { Good: "good", Average: "mid", Bad: "bad" };     // «mid», а не «avg»: класс .avg уже занят подписью среднего балла
+const mood = (m) => MOOD[m] || "good";
+const R_P = 0, R_C = 1, R_M = 2, R_D = 3, R_K = 4, R_ME = 5, R_A = 6;     // столбцы строки списка параллели
+const myRow = (rows) => rows.find((r) => r[R_ME]) || null;
+function listFor(board, mode) {                                           // «class»: только свой класс по месту в классе; иначе вся параллель
+  const me = myRow(board);
+  if (mode === "class" && me) return board.filter((r) => r[R_C] === me[R_C]).sort((a, b) => (a[R_K] || 9999) - (b[R_K] || 9999));
+  return board;
+}
+function around(rows) {                                                    // три строки: ученик и соседи
+  const i = rows.findIndex((r) => r[R_ME]);
+  if (i < 0) return rows.slice(0, 3);
+  const st = Math.max(0, Math.min(i - 1, rows.length - 3));
+  return rows.slice(st, st + 3);
+}
+const markNum = (m) => { const v = parseFloat(String(m || "").replace(",", ".")); return Number.isFinite(v) ? v : null; };
+const barWidth = (m) => { const v = markNum(m); return v == null ? 60 : Math.max(32, Math.min(100, Math.round(((v - 2) / 3) * 100))); };   // длина полоски — по среднему баллу, как в приложении
+function classTone(idx, mine) {                                           // свой класс синий, остальные — розовый, зелёный, оранжевый
+  if (idx === mine) return "";
+  return ["alt", "c2", "c3"][(idx > mine ? idx - 1 : idx) % 3];
+}
+
+function boardRow(r, mode, myCls, classes) {
+  const place = mode === "class" ? r[R_K] : r[R_P], mine = r[R_C] === myCls, name = classes[r[R_C]] || "", tone = classTone(r[R_C], myCls);
+  const badge = mode === "class" ? `<span class="dia sm">${place}</span>` : `<span class="dw"><span class="cir ${tone}">${place}</span>${place === 1 ? `<i class="crown">👑</i>` : ""}</span>`;
+  const who = r[R_ME] ? esc((data?.student?.name || "Я").slice(0, 1).toUpperCase()) : avatarOf(r[R_A]);
+  const chg = r[R_D] ? `<span class="dl ${downChange(r[R_D]) ? "neg" : "pos"} ${r[R_ME] ? "solid" : ""}">${esc(fmtChange(r[R_D]))}</span>` : "";
+  const right = mode === "all" && r[R_K] && mine ? `<span class="rk"><span class="dia sm">${r[R_K]}</span><small>место<br>в ${esc(name)}</small></span>` : "";
+  return `<div class="brow ${r[R_ME] ? "me" : ""}">${badge}<span class="bar2 ${tone}" style="--w:${barWidth(r[R_M])}%"><span>${esc(name)}</span><i class="av ${r[R_ME] ? "own" : ""}">${who}</i></span>
+    <span class="bm">${esc(r[R_M])}</span>${chg}${right}</div>`;
+}
+
+// ---------- история мест: сайт показывает только сегодняшние места, прежние копит роутер (раз в день) ----------
+const ratingHistory = () => ratingData()?.history || [];
+function histAgo(days) {
+  const lim = iso(new Date(Date.now() - days * 864e5)), h = ratingHistory();
+  for (let i = h.length - 1; i >= 0; i--) if (h[i].d <= lim) return h[i];
+  return null;
+}
+function pastPoints(get) {                                                  // до двух прошлых значений: неделю и две недели назад (или раньше, если истории меньше)
+  const out = [];
+  for (const days of [7, 14]) { const e = histAgo(days); if (e && get(e) && !out.some((o) => o.d === e.d)) out.push({ d: e.d, v: get(e) }); }
+  if (!out.length) { const e = histAgo(1); if (e && get(e)) out.push({ d: e.d, v: get(e) }); }
+  return out;
+}
+function pastLine(now, get) {                                              // коротко для плитки: «неделю назад: 19 ▲» (стрелка вверх — место стало выше)
+  const p = pastPoints(get)[0];
+  if (!p || !now) return "";
+  const days = Math.round((parse(todayIso()) - parse(p.d)) / 864e5);
+  const when = days >= 7 && days < 14 ? "неделю назад" : days === 1 ? "вчера" : shortDate(p.d);
+  const dir = now < p.v ? "up" : now > p.v ? "down" : "";
+  return `<span class="ph">${when}: <i>${p.v}</i>${dir ? ` <i class="${dir}">${dir === "up" ? "▲" : "▼"}</i>` : ""}</span>`;
+}
+function sparkChart() {                                                     // как менялось место: в классе и в параллели (выше — лучше)
+  const r = ratingData(), h = [...ratingHistory()];
+  const today = todayIso();
+  if (!h.length || h[h.length - 1].d !== today) h.push({ d: today, c: r?.class?.place, p: r?.parallel?.place });
+  const pts = h.filter((x) => x.c || x.p);
+  if (pts.length < 2) return "";
+  const W = 320, H = 120, pad = 16, n = pts.length;
+  const series = (key) => {                                                // у каждой линии свой масштаб: видно, как место двигалось
+    const vals = pts.map((x) => x[key]).filter(Boolean);
+    if (!vals.length) return { line: "", end: "" };
+    const lo = Math.min(...vals) - 1, hi = Math.max(...vals) + 1;
+    const xy = pts.map((x, i) => x[key] ? [pad + (i * (W - 2 * pad - 22)) / (n - 1), pad + ((x[key] - lo) / (hi - lo)) * (H - 2 * pad)] : null).filter(Boolean);
+    const [lx, ly] = xy[xy.length - 1];
+    return { line: xy.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" "), end: `<circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="4.5" class="dot ${key}"/><text x="${(lx + 8).toFixed(1)}" y="${(ly + 4).toFixed(1)}">${vals[vals.length - 1]}</text>` };
+  };
+  const c = series("c"), pp = series("p");
+  return `<div class="scr-card"><div class="scr-card-h"><b>Как менялось место</b></div><div class="scr-note" style="margin:-6px 6px 8px">${shortDate(pts[0].d)} — сегодня</div>
+    <div class="legend2"><span><i style="background:#ffd166"></i>в классе</span><span><i style="background:#7fb6ff"></i>в параллели</span></div>
+    <svg class="spark" viewBox="0 0 ${W} ${H}" aria-label="График мест"><polyline class="ln p" points="${pp.line}"/><polyline class="ln c" points="${c.line}"/>${pp.end}${c.end}</svg>
+    <div class="note-calc">Чем выше линия, тем выше место. История копится с первого дня работы рейтинга в программе.</div></div>`;
+}
+
+// ---------- места классов: считаем сами по средним баллам учеников (в веб-версии сайта этого экрана нет) ----------
+function classStats(board) {
+  const by = {};
+  for (const r of board || []) { const v = markNum(r[R_M]); if (v != null) (by[r[R_C]] ??= []).push(v); }
+  const avgs = Object.entries(by).map(([c, v]) => ({ c: Number(c), avg: Math.round((v.reduce((a, b) => a + b, 0) / v.length) * 100) / 100, n: v.length }));
+  avgs.sort((a, b) => b.avg - a.avg || a.c - b.c);
+  let place = 0, last = null;
+  avgs.forEach((x, i) => { if (x.avg !== last) { place = i + 1; last = x.avg; } x.place = place; });
+  return avgs;
+}
+const fmtAvg = (v) => v.toFixed(2).replace(".", ",");
+const MEDAL = { 1: "g", 2: "s", 3: "b" };
+function classBadges(stats, classes, myCls, pastK) {
+  return stats.map((x) => {
+    const mine = x.c === myCls, moved = mine && pastK ? pastK - x.place : 0;
+    return `<span class="cb ${mine ? "mine" : ""}" title="${esc(classes[x.c] || "")}: ${fmtAvg(x.avg)}">${esc(classes[x.c] || "?")}${mine ? "<small>Вы</small>" : ""}
+      ${MEDAL[x.place] ? `<span class="md ${MEDAL[x.place]}">${x.place}</span>` : ""}${moved ? `<span class="mv ${moved > 0 ? "up" : "down"}">${moved > 0 ? "+" : ""}${moved}</span>` : ""}</span>`;
+  }).join("");
+}
+function classesView() {
+  const r = ratingData(), classes = r?.classes || [], me = myRow(r?.board || []);
+  if (!me) return `<div class="scr-card">Чтобы сравнить классы, нужен список параллели. Он появится после следующего обновления.</div>`;
+  const myCls = me[R_C], week = histAgo(7);
+  const all = classStats(r.board), mineAll = all.find((x) => x.c === myCls);
+  let h = `<div class="scr-card"><div class="scr-card-h"><b>Ваш класс ${esc(classes[myCls] || "")}</b><span class="r">${mineAll ? `${mineAll.place}-е место из ${all.length}` : ""}</span></div>
+    <button class="crow" data-open-cls=""><span class="cn">Общий</span><span class="cls">${classBadges(all, classes, myCls, week?.k)}</span><span class="chv">›</span></button>
+    <div class="note-calc">Средний балл класса: ${mineAll ? fmtAvg(mineAll.avg) : "—"}. Места классов посчитаны по средним баллам учеников из рейтинга Дневник.ру.</div></div>
+    <h2 class="scr-h">По предметам</h2><div class="scr-card">`;
+  const subs = (r.subjects || []).filter((x) => (x.board || []).length);
+  h += subs.map((x) => {
+    const st = classStats(x.board), b = myRow(x.board);
+    const past = week?.s?.[x.name]?.[2];
+    return `<button class="crow" data-open-cls="${esc(x.name)}"><span class="cn">${esc(x.name)}</span><span class="cls">${classBadges(st, classes, b ? b[R_C] : myCls, past)}</span><span class="chv">›</span></button>`;
+  }).join("") || `<div class="scr-note">Списков по предметам пока нет.</div>`;
+  return h + `</div>`;
+}
+function clsScreen(sc) {
+  const r = ratingData(), classes = r?.classes || [], sub = sc.name ? ratingFor(sc.name) : null;
+  const board = (sub ? sub.board : r?.board) || [], me = myRow(board), myCls = me ? me[R_C] : -1;
+  const st = classStats(board), mine = st.find((x) => x.c === myCls);
+  const podium = (items, av) => {
+    const order = [items[1], items[0], items[2]];
+    return `<div class="podium">${order.map((x, i) => x ? `<div class="p${[2, 1, 3][i]}">${av(x)}<small>${esc(x.label)}</small><div class="step">${[2, 1, 3][i]}</div></div>` : "<div></div>").join("")}</div>`;
+  };
+  let h = scrTop(sub ? sub.name : "Общий рейтинг классов", mine ? `Сегодня ваш класс на ${mine.place}-м месте` : "");
+  h += `<div class="scr-card"><div class="scr-card-h"><b>Места классов</b><span class="r">по среднему баллу</span></div>
+    ${podium(st.slice(0, 3).map((x) => ({ ...x, label: `${classes[x.c] || "?"} · ${fmtAvg(x.avg)}` })), (x) => `<div class="pav ${x.c === myCls ? "own" : ""}" style="font-size:16px;font-weight:800;color:#1b2a7a">${esc(classes[x.c] || "?")}</div>`)}
+    ${st.length > 3 ? `<div class="note-calc">${st.slice(3).map((x) => `${x.place}. ${esc(classes[x.c] || "?")} · ${fmtAvg(x.avg)}`).join(" · ")}</div>` : ""}</div>`;
+  if (me) {
+    const mates = board.filter((x) => x[R_C] === myCls).sort((a, b) => (a[R_K] || 999) - (b[R_K] || 999));
+    const ava = (x) => `<div class="pav ${x[R_ME] ? "own" : ""}">${x[R_ME] ? esc((data?.student?.name || "Я").slice(0, 1)) : avatarOf(x[R_A])}</div>`;
+    h += `<div class="scr-card"><div class="scr-card-h"><b>Топ учеников ${esc(classes[myCls] || "")}</b></div>${podium(mates.slice(0, 3).map((x) => Object.assign([...x], { label: x[R_M] })), ava)}</div>`;
+    const ups = mates.filter((x) => x[R_D] && !downChange(x[R_D])).sort((a, b) => markNum(b[R_D]) - markNum(a[R_D])).slice(0, 3);
+    if (ups.length) h += `<div class="scr-card"><div class="scr-card-h"><b>Топ изменений ср. балла</b></div>${ups.map((x) => boardRow(x, "class", myCls, classes)).join("")}</div>`;
+    h += `<div class="scr-card"><div class="scr-card-h"><b>Ваш средний балл</b><span class="r">${me[R_D] ? `<span class="dl ${downChange(me[R_D]) ? "neg" : "pos"} solid">${esc(fmtChange(me[R_D]))}</span>` : "без изменений"}</span></div>
+      ${boardRow(me, "class", myCls, classes)}</div>`;
+  }
+  h += `<div class="note-calc" style="text-align:center">Места классов посчитаны программой по средним баллам учеников. В приложении Дневник.ру цифры могут немного отличаться.</div>`;
+  return { html: h, theme: "blue" };
+}
+
+// ---------- экраны поверх страницы: «Ваш рейтинг», списки, предмет, урок. Кнопка «назад» браузера и телефона закрывает верхний ----------
+let screens = [];
+function openScreen(sc) {
+  const fromMark = !!markKey;
+  markKey = null; showMarkModal();
+  screens.push(sc);
+  try { (fromMark && history.state?.m ? history.replaceState : history.pushState).call(history, { scr: screens.length }, ""); } catch {}
+  renderScreen("push");
+}
+function backScreen() {
+  if (!screens.length) return;
+  try { history.back(); } catch { popScreens(screens.length - 1); }
+}
+function popScreens(depth) {
+  if (screens.length <= depth) return;
+  const el = $("#screen");
+  if (el.innerHTML) {                                                       // уходящий экран уезжает вправо, под ним уже новый
+    const g = el.cloneNode(true); g.removeAttribute("id"); g.classList.remove("push"); g.classList.add("scr-ghost");
+    document.body.appendChild(g); g.scrollTop = el.scrollTop;
+    setTimeout(() => g.remove(), 300);
+  }
+  while (screens.length > depth) screens.pop();
+  renderScreen();
+}
+try { if (history.state?.scr || history.state?.m) history.replaceState({}, ""); } catch {}
+window.addEventListener("popstate", () => {
+  const st = history.state || {};
+  if (markKey && !st.m) { markKey = null; showMarkModal(); }               // «назад» на телефоне закрывает карточку оценки
+  popScreens(st.scr || 0);
+});
+const scrTop = (title, sub = "") => `<div class="scr-top"><button class="scr-back" data-scr-back aria-label="Назад">‹</button><div class="scr-title"><h1>${esc(title)}</h1>${sub ? `<small>${esc(sub)}</small>` : ""}</div></div>`;
+function renderScreen(anim = "") {
+  const el = $("#screen"), sc = screens[screens.length - 1];
+  document.body.classList.toggle("has-screen", !!sc);
+  if (!sc || !data) { el.innerHTML = ""; el.className = ""; delete el.dataset.sig; return; }
+  const top = el.scrollTop, same = el.dataset.sig === JSON.stringify(sc);
+  const parts = { rating: ratingScreen, board: boardScreen, subject: subjectScreen, lesson: lessonScreen, subjects: subjectsScreen, cls: clsScreen }[sc.t](sc);
+  el.className = `scr scr-${sc.t} ${parts.theme || ""} ${anim}`;
+  el.innerHTML = parts.html;
+  el.dataset.sig = JSON.stringify(sc);
+  el.scrollTop = same ? top : 0;
+}
+
+function ratingScreen(sc) {
+  const r = ratingData(), classes = r?.classes || [], board = r?.board || [], me = myRow(board);
+  const view = sc.view === "cls" ? "cls" : "me";
+  let h = scrTop("Ваш рейтинг", r?.period || "") + seg([["me", "Личный"], ["cls", "Классы"]], view, "data-rview");
+  if (view === "cls") return { html: h + classesView(), theme: "blue" };
+  h += ratingPlaques(true);
+  h += sparkChart();
+  const mini = (mode) => around(listFor(board, mode)).map((x) => boardRow(x, mode, me?.[R_C], classes)).join("");
+  if (board.length && me) {
+    h += `<h2 class="scr-h">Рейтинг общий</h2><div class="scr-card"><div class="scr-card-h"><b>Место в классе</b><button class="lnk" data-open-board="" data-bmode="class">Открыть все</button></div>${mini("class")}</div>
+      <div class="scr-card"><div class="scr-card-h"><b>Место в параллели</b><button class="lnk" data-open-board="" data-bmode="all">Открыть все</button></div>${mini("all")}</div>`;
+  }
+  const subs = [...(r?.subjects || [])].filter((x) => x.place).sort((a, b) => a.place - b.place);
+  if (subs.length) {
+    h += `<h2 class="scr-h">Рейтинг по предметам</h2><p class="scr-note">На основе данных о среднем балле учащихся в параллели${r.period ? ` (${esc(r.period)})` : ""}</p>
+      <div class="scr-card"><div class="scr-card-h"><b>Ваши лучшие места по предмету</b>${subs.length > 3 ? `<button class="lnk" data-open-subjects>Открыть все</button>` : ""}</div>${subs.slice(0, 3).map(subjectRow).join("")}</div>`;
+  }
+  return { html: h, theme: "blue" };
+}
+function subjectRow(x) {
+  return `<button class="srow" data-open-board="${esc(x.name)}" data-bmode="all"><span class="dw"><span class="dia sm s">${x.place}</span>${x.place === 1 ? `<i class="crown">👑</i>` : ""}</span>
+    <span class="sn">${esc(x.name)}</span><span class="sv">${esc(x.mark || "")}</span>
+    ${x.change ? `<span class="dl ${downChange(x.change) ? "neg" : "pos"} solid">${esc(fmtChange(x.change))}</span>` : ""}<span class="chv">›</span></button>`;
+}
+function subjectsScreen() {
+  const r = ratingData(), subs = [...(r?.subjects || [])].filter((x) => x.place).sort((a, b) => a.place - b.place);
+  return { theme: "blue", html: scrTop("Рейтинг по предметам", r?.period || "") + `<p class="scr-note" style="text-align:center">На основе данных о среднем балле учащихся в параллели</p>
+    <div class="scr-card"><b>Ваш рейтинг по предметам</b>${subs.map(subjectRow).join("") || `<div class="scr-note">Пока пусто.</div>`}</div>` };
+}
+function boardScreen(sc) {
+  const r = ratingData(), sub = sc.name ? ratingFor(sc.name) : null, classes = r?.classes || [];
+  const board = (sub ? sub.board : r?.board) || [], me = myRow(board), rows = listFor(board, sc.mode);
+  const k = sub ? sub.classPlace : r?.class?.place, pl = sub ? sub.place : r?.parallel?.place;
+  const nm = data?.student?.name || "Ученик";
+  const toggle = sc.mode === "class" ? "Показать все" : (me ? classes[me[R_C]] || "Класс" : "Класс");
+  const line = k && pl ? `<b>${esc(nm)}</b>сейчас на ${k}-м месте <span class="medal">🥇</span> в классе и на ${pl}-м месте в параллели` : `<b>${esc(nm)}</b>`;
+  return { theme: "blue", html: scrTop(sub ? `Рейтинг по предмету ${sub.name}` : "Персональный рейтинг") + `<div class="b-line">${line}</div>
+    <div class="b-cols"><span>Место в ${sc.mode === "class" ? "классе" : "параллели"}</span><span>Ср. балл</span><button class="tgl" data-bmode-toggle>${esc(toggle)}</button></div>
+    <div class="b-list">${rows.map((x) => boardRow(x, sc.mode, me?.[R_C], classes)).join("") || `<div class="scr-note">Списка пока нет.</div>`}</div>` };
+}
+
+// Подсказка сайта, как в приложении: «Получите 6×5 или 20×4, чтобы повысить балл до четверки», «покорим новые вершины», «мало оценок»
+function adviceOf(rs) {
+  const h = rs?.hint || [];
+  if (!h.length) return null;
+  const text = h.map((x) => (typeof x === "string" ? x : `${x[1]}×${x[0]}`)).join("");
+  const marksIn = h.filter(Array.isArray);
+  const goal = ({ пятерки: 5, четверки: 4, тройки: 3 })[(/до (пятерки|четверки|тройки)/.exec(text) || [])[1]] || "";
+  if (marksIn.length) return { kind: "up", text, goal, short: marksIn.map(([v, n]) => `${n} <span class="mark xs ${cls(v)}">${v}</span>`).join(" или ") + (goal ? ` до ${goal}` : "") };
+  if (/мало оценок/.test(text)) return { kind: "few", text, short: "По предмету мало оценок!" };
+  return { kind: "ok", text };
+}
+function adviceHtml(rs) {
+  return (rs?.hint || []).map((x) => (typeof x === "string" ? esc(x) : `${x[1]} x <span class="mark sm ${cls(x[0])}">${x[0]}</span>`)).join("");
+}
+const subjectMarks = (name) => allMarks().filter((m) => m.subject === name);
+const chipOf = (m) => `<span class="mark sm tap ${cls(m.value.split("/")[0])}" role="button" tabindex="0" data-mark="${esc(m.key)}" aria-label="Оценка ${esc(m.value)}, ${esc(m.subject)}: подробности">${esc(m.value)}</span>`;
+function chipsRow(list, limit = 10) {
+  let lead = 0;
+  while (lead < list.length && list[lead].value === "5") lead++;
+  const chips = list.slice(0, limit).map(chipOf);
+  if (lead >= 3) { const n = Math.min(lead, chips.length); chips.splice(0, n, `<span class="streak">${chips.slice(0, n).join("")}<em>подряд!</em></span>`); }
+  if (list.length > limit) chips.push(`<span class="mark sm dots" aria-hidden="true">…</span>`);
+  return `<div class="chips" data-mctx="subject:${esc(list[0]?.subject || "")}">${chips.join("")}</div>`;
+}
+const localAvg = (list) => { const n = numMarks(list); return n.length ? mean(n).toFixed(2).replace(".", ",") : ""; };
+function subjectCard(name, list) {
+  const rs = ratingFor(name), s = subj(name), avg = rs?.mark || localAvg(list), adv = adviceOf(rs);
+  const tile = adv && adv.kind !== "ok";
+  const chg = rs?.change ? `<span class="achg ${downChange(rs.change) ? "neg" : "pos"}">${downChange(rs.change) ? "↓" : "↑"} ${esc(rs.change.replace(/^[+-]/, ""))}</span>` : "";
+  const right = tile
+    ? `<div class="atile ${mood(rs.mood)}">${chg}<strong>${esc(avg)}</strong><small>Ср. балл</small><div class="aadv">${adv.short}</div><div class="alab">можно повысить</div></div>`
+    : `<div class="avg2"><strong>${esc(avg)}</strong><small>Ср. балл</small></div>`;
+  const bar = rs && (rs.classPlace || rs.place) ? `<div class="sbar">${rs.classPlace ? `<span class="dia sm">${rs.classPlace}</span><span class="sl">рейтинг<br>в классе</span>` : ""}${rs.place ? `<span class="dia sm s">${rs.place}</span><span class="sl">рейтинг<br>в параллели</span>` : ""}</div>` : "";
+  return `<div class="scard ${mood(rs?.mood)} tap" role="button" tabindex="0" data-open-subject="${esc(name)}" data-icon="${s.icon}" aria-label="${esc(name)}: подробности">
+    <div class="sc-main"><div class="sc-left"><div class="sc-name">${esc(name)}</div>${chipsRow(list)}</div>${right}</div>${bar}</div>`;
+}
+function ratingPlaques(withPast = true) {
+  const r = ratingData();
+  if (!r || !(r.class?.place || r.parallel?.place)) return "";
+  const one = (x, kind, label, key) => (x?.place ? `<button class="plq" data-open-rating><span class="${kind}">${x.place}</span><b>Рейтинг<br>${label}${withPast ? pastLine(x.place, (e) => e[key]) : ""}</b></button>` : "");
+  return `<div class="plaques">${one(r.class, "dia", "в классе", "c")}${one(r.parallel, "dia s", "в параллели", "p")}</div>`;
+}
+
+// Окно предмета: соседи в рейтинге, средний балл с подсказкой сайта и все оценки по предмету
+function subjectScreen(sc) {
+  const name = sc.name, rs = ratingFor(name), list = subjectMarks(name), classes = ratingData()?.classes || [];
+  const board = rs?.board || [], me = myRow(board);
+  const avg = rs?.mark || localAvg(list), chg = rs?.change;
+  let h = scrTop(name, ratingData()?.period || "");
+  if (me && board.length) {
+    const past = pastPoints((e) => e.s?.[name]?.[1]);
+    h += `<div class="scr-card light"><div class="scr-card-h"><b>В параллели</b><b class="r">В классе</b></div>${around(board).map((x) => boardRow(x, "all", me[R_C], classes)).join("")}
+      ${past.length ? `<div class="note-calc">Раньше в параллели: ${past.map((p) => `${shortDate(p.d)} — ${p.v}`).join(", ")}</div>` : ""}
+      <button class="lnk center" data-open-board="${esc(name)}" data-bmode="all">Открыть все ›</button></div>`;
+  }
+  const adv = rs?.hint ? adviceHtml(rs) : "";
+  h += `<div class="scr-card light"><div class="sj-avg"><div class="atile ${mood(rs?.mood)}">${chg ? `<span class="achg ${downChange(chg) ? "neg" : "pos"}">${downChange(chg) ? "↓" : "↑"} ${esc(chg.replace(/^[+-]/, ""))}</span>` : ""}<strong>${esc(avg)}</strong><small>ср. балл<br>общий</small></div>
+    <div class="sj-adv">${adv || (list.length ? "" : "Оценок по предмету пока нет.")}</div></div>
+    <div class="chips" data-mctx="subject:${esc(name)}">${list.map(chipOf).join("")}</div></div>
+    ${rs?.board?.length ? `<button class="share" data-open-cls="${esc(name)}" style="margin-top:12px">Места классов по предмету</button>` : ""}
+    <button class="share" data-share>Поделиться</button>`;
+  return { html: h, theme: `subj ${mood(rs?.mood)}` };
+}
+function shareText(name) {
+  const rs = ratingFor(name), list = subjectMarks(name);
+  const bits = [`${name}: средний балл ${rs?.mark || localAvg(list) || "—"}`];
+  if (rs?.classPlace) bits.push(`место в классе ${rs.classPlace}`);
+  if (rs?.place) bits.push(`в параллели ${rs.place}`);
+  return bits.join(", ") + `. Оценки: ${list.map((m) => m.value).join(" ")}`;
+}
+let toastTimer = null;
+function toast(msg) {
+  const t = $("#toast"); t.textContent = msg; t.classList.add("on");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("on"), 2200);
+}
+async function copyText(text, done) {
+  try { await navigator.clipboard.writeText(text); toast(done); }
+  catch { toast("Не получилось скопировать"); }
+}
+async function shareScreen() {
+  const sc = screens[screens.length - 1]; if (!sc || sc.t !== "subject") return;
+  const text = shareText(sc.name);
+  try { if (navigator.share) { await navigator.share({ text }); return; } } catch (e) { if (e && e.name === "AbortError") return; }
+  copyText(text, "Скопировано, можно вставить в сообщение");
+}
+
+// Страница урока («Описание урока»): дата и время, тема, отметки, домашнее задание, учитель
+function lessonScreen(sc) {
+  const [date, li] = String(sc.key).split("|"), day = data.days.find((d) => d.date === date), l = day?.lessons[Number(li)];
+  if (!l) return { html: scrTop("Урок") + `<div class="scr-note">Урок не найден.</div>`, theme: "light" };
+  const dt = parse(date), done = store.get("done", {}), dk = `${date}|${l.subject}|${l.n}`, isDone = !!done[dk];
+  const teachers = teachersOf(l.subject).map((t) => t.name).filter(Boolean);
+  const hw = !noHw(l.homework) ? l.homework : "";
+  return { theme: "light", html: scrTop(l.subject) + `<div class="ls-head"><small>${dt.getDate()} ${MONTHS[dt.getMonth()].toUpperCase()}, ${(WD[day.weekday] || "").toUpperCase()}<br>${esc(l.start)}–${esc(l.end)}</small>
+      <div class="ls-n">${esc(l.n)} УРОК</div><h2>${esc(l.subject)}</h2><div class="ls-theme">${esc(l.theme || "Тема урока пока не указана")}</div></div>
+    ${l.marks.length ? `<h3 class="ls-h">Отметки</h3><div class="ls-box">${l.marks.map((m, mi) => `<div class="ls-mark">${tapMark(date, Number(li), mi, m, l.subject)}<span>${esc(m.work || "")}</span></div>`).join("")}</div>` : ""}
+    ${hw || (l.files || []).length ? `<h3 class="ls-h">Домашнее задание к уроку</h3><div class="ls-box"><div class="ls-hw ${isDone ? "done" : ""}"><span>${esc(hw)}</span>
+      <button class="check ${isDone ? "on" : ""}" data-lesson-done="${esc(dk)}" aria-label="Сделано">✓</button></div>${fileChips(l)}
+      ${hw ? `<button class="lnk center" data-copy-hw="${esc(`${date}|${li}`)}">Скопировать текст задания</button>` : ""}</div>` : ""}
+    ${teachers.length ? `<h3 class="ls-h">Урок проводит</h3><div class="ls-box">${teachers.map((t) => `<div class="ls-t"><i>${esc(t.split(" ").map((x) => x[0]).join("").slice(0, 2).toUpperCase())}</i>${esc(t)}</div>`).join("")}</div>` : ""}` };
+}
+
+// ---------- Главная («Домашка»): лента последних оценок ----------
+const WORK_ABBR = [[/^ответ/i, "ОТВ"], [/диктант/i, "ДИ"], [/практическ/i, "П/Р"], [/самостоятельн/i, "С/Р"], [/контрольн/i, "К/Р"], [/тест/i, "ТЕСТ"], [/зач[её]т/i, "ЗАЧ"], [/проект/i, "ПРОЕКТ"], [/домашн/i, "Д/Р"]];
+function workAbbr(w) {
+  const hit = WORK_ABBR.find(([re]) => re.test(w || ""));
+  if (hit) return hit[1];
+  const t = String(w || "").trim();
+  return t ? t.split(/\s+/).map((x) => x[0]).join("").toUpperCase().slice(0, 3) : "ОЦЕНКА";
+}
+function recentStrip() {
+  const marks = allMarks().slice(0, 12);
+  if (!marks.length) return "";
+  return `<h2 class="strip-h">Последние оценки</h2><div class="rstrip" data-mctx="recent">${marks.map((m) => `<div class="rtile2 tap" role="button" tabindex="0" data-mark="${esc(m.key)}" aria-label="Оценка ${esc(m.value)}, ${esc(m.subject)}: подробности">
+    <span class="mark ${cls(m.value.split("/")[0])}">${esc(m.value)}</span><b>${esc(m.subject)}</b><small>${esc(workAbbr(m.work))}, за ${esc(shortDate(m.date))}</small></div>`).join("")}</div>`;
+}
+
+// ---------- Карточка оценки: как в приложении (когда выставлена, как справился класс, места по предмету, переход на урок и к оценкам по предмету) ----------
+let markKey = null, markList = [];
 const numMarks = (list) => list.map((m) => Number(String(m.value).trim().split("/")[0])).filter((x) => x >= 1 && x <= 5);
 const mean = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
+function setMarkContext(el) {
+  const c = el?.closest?.("[data-mctx]")?.dataset.mctx || "";
+  const all = allMarks();
+  markList = (c === "recent" ? all.slice(0, 12) : c.startsWith("subject:") ? all.filter((m) => m.subject === c.slice(8)) : []).map((m) => m.key);
+}
 function markDetails(key) {
   const [date, li, mi] = String(key).split("|");
   const lesson = data?.days.find((d) => d.date === date)?.lessons[Number(li)], mark = lesson?.marks[Number(mi)];
   if (!mark) return null;
   const subject = lesson.subject, mine = String(mark.value ?? "").trim(), when = mark.created || date;
+  const info = (mark.id && data.markInfo?.[mark.id]) || null, rs = ratingFor(subject);
   const same = allMarks().filter((m) => m.subject === subject);
   const avg = mean(numMarks(same)), before = mean(numMarks(same.filter((m) => m.created < when)));
   const y = (data.years || []).find((x) => x.current);                       // средний балл за период берём тот же, что показывает сайт, если он есть
   const term = y && (y.terms || []).find((t) => t.start && t.finish && date >= t.start && date <= t.finish);
-  const official = String((term?.subjects || []).find((s) => s.name === subject)?.average || "");
-  const value = official || (avg != null ? avg.toFixed(2).replace(".", ",") : "");
+  const official = String((term?.subjects || []).find((x) => x.name === subject)?.average || "");
+  const value = info?.avg || official || (avg != null ? avg.toFixed(2).replace(".", ",") : "");
   const mine1 = Number(mine.split("/")[0]);
-  const trend = before != null && mine1 >= 1 && mine1 <= 5 ? (mine1 > before ? "↑" : mine1 < before ? "↓" : "") : "";   // стрелка: оценка подняла или опустила средний балл
-  return { date, subject, mine, work: mark.work || "Оценка", value, num: Number(value.replace(",", ".")), trend, official: !!official,
-    theme: (lesson.theme || "").replace(/\s+/g, " ").trim(), teachers: teachersOf(subject).map((t) => t.name).filter(Boolean) };
+  let trend = before != null && mine1 >= 1 && mine1 <= 5 ? (mine1 > before ? "↑" : mine1 < before ? "↓" : "") : "";   // стрелка: оценка подняла или опустила средний балл
+  if (info?.tr) trend = info.tr === "up" ? "↑" : info.tr === "down" ? "↓" : "";
+  return { key, date, subject, mine, work: mark.work || "Оценка", value, num: Number(value.replace(",", ".")), trend, official: !!(info?.avg || official), mood: info?.mood || rs?.mood || "",
+    posted: `Выставлено ${shortDate(when)} за урок ${shortDate(date)}`, classmates: info?.cm || [], pc: info?.pc ?? rs?.classPlace ?? 0, pp: info?.pp ?? rs?.place ?? 0,
+    theme: (lesson.theme || "").replace(/\s+/g, " ").trim(), teachers: teachersOf(subject).map((t) => t.name).filter(Boolean), icon: subj(subject).icon };
+}
+let markAnim = "";
+function openMark(key, el) {                        // открыть карточку оценки; «назад» на телефоне её закроет
+  if (el) setMarkContext(el);
+  const was = !!markKey;
+  markKey = key; markAnim = "";
+  if (!was) { try { history.pushState({ ...(history.state || {}), m: 1 }, ""); } catch {} }
+  showMarkModal();
+}
+function closeMark() {
+  if (!markKey) return;
+  if (history.state?.m) { try { history.back(); return; } catch {} }
+  markKey = null; showMarkModal();
 }
 function showMarkModal() {                         // только окно: страница под ним не перерисовывается (раскрытые уроки и прокрутка остаются)
   $("#modal").innerHTML = confirmModal() || markModal();
-  if (markKey) { const x = document.querySelector("#modal .mm-x"); if (x) x.focus(); }
+  if (markKey) { const x = document.querySelector("#modal .mm-x"); if (x) x.focus({ preventScroll: true }); }
+}
+function markStep(delta) {
+  const i = markList.indexOf(markKey), next = markList[i + delta];
+  if (i < 0 || !next) return;
+  markKey = next; markAnim = delta > 0 ? "slide-l" : "slide-r"; showMarkModal(); markAnim = "";
+}
+const MARK_VAR = { 5: "--m5", 4: "--m4", 3: "--m3", 2: "--m2", 1: "--m1", "ЗЧ": "--m5", "ЗАЧ": "--m5" };
+function donut(mine, cm) {                          // кольцо: доли оценок класса за эту работу, в середине — своя оценка
+  const total = cm.reduce((s, x) => s + x[1], 0), C = 2 * Math.PI * 50;
+  let off = 0;
+  const segs = total ? cm.map(([v, n]) => {
+    const len = (n / total) * C, gap = cm.length > 1 ? 3 : 0;
+    const s = `<circle r="50" cx="60" cy="60" style="stroke:var(${MARK_VAR[String(v).toUpperCase()] || "--mx"})" stroke-dasharray="${Math.max(0, len - gap).toFixed(1)} ${C.toFixed(1)}" stroke-dashoffset="${(-off).toFixed(1)}"/>`;
+    off += len; return s;
+  }).join("") : "";
+  const first = mine.split("/")[0];
+  return `<div class="donut"><svg viewBox="0 0 120 120" aria-hidden="true"><circle class="track" r="50" cx="60" cy="60"/>${segs}</svg><span class="mid ${cls(first)}">${esc(mine)}</span></div>`;
 }
 function markModal() {
   const d = markKey && data ? markDetails(markKey) : null;
   if (!d) return "";
-  const avgCls = d.value && d.num ? cls(Math.round(d.num)) : "";
-  return `<div class="modal-back" data-modal-back><div class="modal markmodal" role="dialog" aria-modal="true" aria-labelledby="mtitle">
-    <div class="mm-head"><div><h3 id="mtitle">${esc(d.subject)}</h3><div class="mm-sub">${esc(d.work)}, ${dayName(d.date)}</div></div>
+  const avgCls = d.mood ? ({ Good: "m5", Average: "m3", Bad: "m1" })[d.mood] : (d.value && d.num ? cls(Math.round(d.num)) : "");
+  const i = markList.indexOf(d.key), nav = markList.length > 1 && i >= 0;
+  const total = d.classmates.reduce((s, x) => s + x[1], 0);
+  const cm = d.classmates.map(([v, n, md]) => `<div class="cmrow"><span class="mark xs ${cls(v) || ({ Good: "m5", Average: "m3", Bad: "m1" })[md] || ""}">${esc(v)}</span><span>${n} ${plural(n, ["ученик", "ученика", "учеников"])}</span>${total ? `<span class="pc">${Math.round((n / total) * 100)}%</span>` : ""}</div>`).join("");
+  const plaques = d.pc || d.pp ? `<div class="plaques in-modal">${d.pc ? `<button class="plq" data-open-board="${esc(d.subject)}" data-bmode="class"><span class="dia">${d.pc}</span><b>Рейтинг<br>в классе ›</b></button>` : ""}${d.pp ? `<button class="plq" data-open-board="${esc(d.subject)}" data-bmode="all"><span class="dia s">${d.pp}</span><b>Рейтинг<br>в параллели ›</b></button>` : ""}</div>` : "";
+  const first = d.mine.split("/")[0];
+  const mine = cm ? donut(d.mine, d.classmates) : `<span class="mm-big ${cls(first)}">${esc(d.mine)}</span>`;
+  return `<div class="modal-back sheet ${markAnim ? "nofade" : ""}" data-modal-back><div class="modal markmodal ${markAnim}" role="dialog" aria-modal="true" aria-labelledby="mtitle">
+    <div class="mm-hero ${cls(first) || "m0"}"><div class="mm-when">📅 ${esc(d.posted)}</div><div class="mm-hrow"><div><h3 id="mtitle">${esc(d.subject)}</h3><div class="mm-sub">${esc(d.work)}</div></div>
+      <span class="mm-ic" aria-hidden="true">${d.icon}</span></div>
       <button class="mm-x" data-mark-close aria-label="Закрыть">✕</button></div>
     ${d.teachers.length ? `<div class="mm-line"><span class="k">Учитель:</span> ${esc(d.teachers.join(", "))}</div>` : ""}
-    ${d.theme ? `<div class="mm-line"><span class="k">Тема урока:</span><div class="mm-theme">${esc(d.theme)}</div></div>` : ""}
-    <div class="mm-box"><div><b>Оценка</b><span class="mm-big ${cls(d.mine.split("/")[0])}">${esc(d.mine)}</span></div>
-      <div><b>Средний балл</b>${d.value ? `<span class="mm-avg ${avgCls}">${esc(d.value)}${d.trend ? `<span aria-label="${d.trend === "↑" ? "оценка подняла средний балл" : "оценка опустила средний балл"}">${d.trend}</span>` : ""}</span>
-        <div class="mm-note">${d.official ? "по предмету за этот период" : "по всем оценкам по предмету"}</div>` : `<div class="mm-note">пока нет</div>`}</div></div>
-    <div class="mbtns"><button class="safe" data-mark-close>Закрыть</button></div></div></div>`;
+    ${d.theme ? `<div class="mm-line"><span class="k">Тема урока:</span> <span class="mm-theme">${esc(d.theme)}</span></div>` : ""}
+    <div class="mm-box ${cm ? "" : "one"}"><div><b>Ваша оценка</b>${mine}
+        <div class="mm-note">ср. балл</div>${d.value ? `<span class="mm-avg ${avgCls}">${esc(d.value)}${d.trend ? `<span aria-label="${d.trend === "↑" ? "оценка подняла средний балл" : "оценка опустила средний балл"}">${d.trend}</span>` : ""}</span>` : `<div class="mm-note">пока нет</div>`}</div>
+      ${cm ? `<div><b>Одноклассники</b>${cm}</div>` : ""}</div>
+    ${plaques}
+    <div class="mbtns"><button class="safe" data-open-lesson="${esc(d.key)}">Описание урока</button><button class="alt" data-open-subject="${esc(d.subject)}">Все оценки по предмету</button></div>
+    ${nav ? `<div class="mm-nav"><button data-mark-nav="-1" ${i === 0 ? "disabled" : ""} aria-label="Новее">‹</button><span>${i + 1} из ${markList.length}</span><button data-mark-nav="1" ${i === markList.length - 1 ? "disabled" : ""} aria-label="Старше">›</button></div>` : ""}
+  </div></div>`;
 }
 
 // ---------- Оценки ----------
@@ -1325,21 +2004,11 @@ function viewMarks() {
   if (hasYears && marksView === "years") return [tabs + viewYears(), ""];
   if (hasYears && marksView === "att") return [tabs + viewAttendance(), ""];
   const marks = allMarks();
-  if (!marks.length) return [tabs + `<div class="empty"><span class="em">⭐</span>Оценок пока нет.</div>`, ""];
-  let out = tabs + recentMarksCard(8);
-
+  if (!marks.length) return [tabs + ratingPlaques() + `<div class="empty"><span class="em">⭐</span>Оценок пока нет.</div>`, ""];
   const by = {};
-  for (const m of marks) (by[m.subject] ??= []).push(m);
-  out += `<h2>По предметам</h2><div class="cards2">`;
-  for (const name of Object.keys(by).sort((a, b) => a.localeCompare(b, "ru"))) {
-    const list = [...by[name]].sort((a, b) => (a.created > b.created ? 1 : -1)), s = subj(name);
-    const n = list.map((m) => Number(m.value)).filter((x) => x >= 1 && x <= 5);
-    const avg = n.length ? (n.reduce((a, b) => a + b, 0) / n.length).toFixed(2).replace(".", ",") : "";
-    out += `<div class="card" style="${s.style}"><div class="subjhead"><div class="ic">${s.icon}</div><b>${esc(name)}</b>
-      ${avg ? `<div class="avg">средний<strong>${avg}</strong></div>` : ""}</div>
-      <div class="chips">${list.map((m) => `<span class="mark sm tap ${cls(m.value)}" role="button" tabindex="0" data-mark="${esc(m.key)}" aria-label="Оценка ${esc(m.value)}, ${esc(name)}: подробности">${esc(m.value)}</span>`).join("")}</div></div>`;
-  }
-  out += `</div>`;
+  for (const m of marks) (by[m.subject] ??= []).push(m);               // оценки каждого предмета: сначала самые новые
+  const names = Object.keys(by).sort((a, b) => (by[b][0].created > by[a][0].created ? 1 : by[b][0].created < by[a][0].created ? -1 : a.localeCompare(b, "ru")));
+  let out = tabs + ratingPlaques() + `<div class="cards2">${names.map((n) => subjectCard(n, by[n])).join("")}</div>`;
   out += currentAttendanceCard() ? `<div style="margin-top:12px">${currentAttendanceCard()}</div>` : "";     // посещаемость внизу экрана
   return [out, ""];
 }
@@ -1366,14 +2035,14 @@ function viewPlan() {
   const dates = data.days.filter((d) => d.lessons.length).map((d) => d.date);
   if (!dates.length) return [ptabs + `<div class="empty"><span class="em">🗓</span>Расписания пока нет.</div>`, ""];
   if (!planDate || !dates.includes(planDate)) planDate = dates.find((d) => d >= todayIso()) ?? dates[dates.length - 1];
-  const out = ptabs + pagerHtml(dates, planDate) + `<div class="plan-body ${pageAnim}" id="plan-body">${dayScheduleCard(planDate, "")}</div>` + swipeHint();
+  const out = ptabs + pagerHtml(dates, planDate, planTarget(dates)) + `<div class="plan-body ${pageAnim}" id="plan-body">${dayScheduleCard(planDate, "")}</div>` + swipeHint();
   pageAnim = "";
   return [out, ""];
 }
 
 // Переключение дня (в «Расписании» и в «Домашке» по одному дню): стрелками или свайпом
 let pageAnim = "";
-const pagedNow = () => !showSettings && !showSetup && !confirmStep && !!data?.days?.length &&
+const pagedNow = () => !showSettings && !showSetup && !confirmStep && !markKey && !screens.length && !!data?.days?.length &&
   ((tab === "plan" && planView === "days") || (tab === "hw" && settings.hwMode === "pages"));
 function shiftPage(delta) {
   const plan = tab === "plan";
@@ -1387,10 +2056,17 @@ function shiftPage(delta) {
 }
 let touch = null;
 document.addEventListener("touchstart", (e) => {
-  touch = e.touches.length === 1 ? { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() } : null;
+  touch = e.touches.length === 1 ? { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now(), el: e.target } : null;
 }, { passive: true });
 document.addEventListener("touchend", (e) => {
+  if (touch && markKey && markList.length > 1 && e.target.closest?.(".markmodal")) {                  // листание оценок свайпом внутри карточки
+    const t = e.changedTouches[0], dx = t.clientX - touch.x, dy = t.clientY - touch.y;
+    touch = null;
+    if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.4) markStep(dx < 0 ? 1 : -1);
+    return;
+  }
   if (!touch || !settings.swipe || !pagedNow()) return;
+  if (touch.el?.closest?.(".rstrip, .chips, .nav, nav.tabs, header, .seg")) { touch = null; return; }      // лента оценок и кнопки листаются сами, дни не трогаем
   const t = e.changedTouches[0], dx = t.clientX - touch.x, dy = t.clientY - touch.y, fast = Date.now() - touch.t < 900;
   touch = null;
   if (fast && Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.4) shiftPage(dx < 0 ? 1 : -1);
@@ -1421,9 +2097,31 @@ document.addEventListener("click", (e) => {
   if (pf) { pushState.prefs = pushState.prefs || defaultPrefs(); pushState.prefs.types[pf.dataset.pf] = !pushState.prefs.types[pf.dataset.pf]; render(); savePushPrefs(); return; }
   const pq = e.target.closest("button[data-pq]");
   if (pq) { pushState.prefs = pushState.prefs || defaultPrefs(); pushState.prefs.quiet.on = !pushState.prefs.quiet.on; render(); savePushPrefs(); return; }
-  if (e.target.closest("[data-mark-close]")) { markKey = null; showMarkModal(); return; }
+  if (e.target.closest("[data-mark-close]")) { closeMark(); return; }
+  const mn = e.target.closest("[data-mark-nav]");
+  if (mn) { markStep(Number(mn.dataset.markNav)); return; }
   const mk = e.target.closest("[data-mark]");
-  if (mk) { markKey = mk.dataset.mark; showMarkModal(); return; }
+  if (mk) { openMark(mk.dataset.mark, mk); return; }
+  if (e.target.closest("[data-scr-back]")) { backScreen(); return; }
+  if (e.target.closest("[data-open-rating]")) { openScreen({ t: "rating" }); return; }
+  if (e.target.closest("[data-open-subjects]")) { openScreen({ t: "subjects" }); return; }
+  const oc = e.target.closest("[data-open-cls]");
+  if (oc) { openScreen({ t: "cls", name: oc.dataset.openCls }); return; }
+  const rv = e.target.closest("[data-rview]");
+  if (rv) { const sc = screens[screens.length - 1]; if (sc?.t === "rating") { sc.view = rv.dataset.rview; renderScreen(); } return; }
+  if (e.target.closest("[data-today]")) { goToday(); return; }
+  const ob = e.target.closest("[data-open-board]");
+  if (ob) { openScreen({ t: "board", name: ob.dataset.openBoard, mode: ob.dataset.bmode === "class" ? "class" : "all" }); return; }
+  const os = e.target.closest("[data-open-subject]");
+  if (os) { openScreen({ t: "subject", name: os.dataset.openSubject }); return; }
+  const ol = e.target.closest("[data-open-lesson]");
+  if (ol) { openScreen({ t: "lesson", key: ol.dataset.openLesson }); return; }
+  if (e.target.closest("[data-bmode-toggle]")) { const sc = screens[screens.length - 1]; if (sc?.t === "board") { sc.mode = sc.mode === "class" ? "all" : "class"; renderScreen(); } return; }
+  if (e.target.closest("[data-share]")) { shareScreen(); return; }
+  const ld = e.target.closest("[data-lesson-done]");
+  if (ld) { const done = store.get("done", {}), k = ld.dataset.lessonDone; done[k] ? delete done[k] : (done[k] = 1); store.set("done", done); renderScreen(); render(); return; }
+  const ch = e.target.closest("[data-copy-hw]");
+  if (ch) { const [d, li] = ch.dataset.copyHw.split("|"); const l = data.days.find((x) => x.date === d)?.lessons[Number(li)]; if (l) copyText(l.homework, "Задание скопировано"); return; }
   const pa = e.target.closest("[data-pass]");
   if (pa) {
     const v = pa.dataset.pass;
@@ -1457,12 +2155,12 @@ document.addEventListener("click", (e) => {
     if (confirmStep === 1) startLogout(); else finishLogout();
     return;
   }
-  if (e.target.matches("[data-modal-back]")) { if (markKey) { markKey = null; showMarkModal(); return; } if (!confirmBusy) closeConfirm(); return; }
+  if (e.target.matches("[data-modal-back]")) { if (markKey) { closeMark(); return; } if (!confirmBusy) closeConfirm(); return; }
   if (e.target.closest("[data-setup-cancel]")) { showSetup = false; setupMsg = null; render(); return; }
   if (e.target.closest("[data-restore]")) { restoreLogin(); return; }
   if (e.target.closest("[data-setup]")) { showSetup = !showSetup; setupMsg = null; render(); window.scrollTo(0, 0); return; }
   const mv = e.target.closest("[data-mview]");
-  if (mv) { marksView = mv.dataset.mview; attDay = null; render(); return; }
+  if (mv) { enterAnim = marksView !== mv.dataset.mview; marksView = mv.dataset.mview; attDay = null; render(); return; }
   const ad = e.target.closest("[data-aday]");
   if (ad) { attDay = attDay === ad.dataset.aday ? null : ad.dataset.aday; const y0 = window.scrollY; render(); window.scrollTo(0, y0); return; }
   const at = e.target.closest("[data-aterm]");
@@ -1474,7 +2172,7 @@ document.addEventListener("click", (e) => {
   const tb = e.target.closest("[data-term]");
   if (tb) { const y = (data.years || [])[yearIdx]; if (y) termSel[y.label] = tb.dataset.term; render(); return; }
   const tabBtn = e.target.closest("nav.tabs button");
-  if (tabBtn) { tab = tabBtn.dataset.tab; showSettings = false; askClearDone = false; render(); window.scrollTo(0, 0); return; }
+  if (tabBtn) { enterAnim = tab !== tabBtn.dataset.tab || showSettings; tab = tabBtn.dataset.tab; showSettings = false; askClearDone = false; render(); window.scrollTo(0, 0); return; }
   const check = e.target.closest(".check");
   if (check) {
     const strip = check.closest(".strip"), done = store.get("done", {}), k = strip.dataset.key;

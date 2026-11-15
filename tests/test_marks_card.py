@@ -68,17 +68,16 @@ class MarksUiBase(unittest.TestCase):
         page.goto(self.url)
         page.wait_for_selector("nav.tabs")
         page.click(f'nav.tabs button[data-tab="{tab}"]')
-        page.wait_for_selector("#main h2, #main .empty, #main .day, #main .lesson")
+        page.wait_for_selector("#main h2, #main .empty, #main .day, #main .lesson, #main .scard, #main .plaques")
         return page
 
 
 class AttendanceBottomTests(MarksUiBase):
     def test_attendance_is_at_the_bottom_of_the_current_screen(self):
         page = self.open()
-        titles = page.eval_on_selector_all("#main h2, #main .att-title", "e => e.map(x => x.textContent.trim())")
-        self.assertEqual(titles[0], "Последние оценки")                                    # сверху больше не посещаемость
-        self.assertEqual([t for t in titles if not t.startswith("Посещаемость")], ["Последние оценки", "По предметам"])
-        self.assertTrue(titles[-1].startswith("Посещаемость"), titles)                      # внизу
+        order = page.eval_on_selector_all("#main .scard, #main .att", "e => e.map(x => x.className.split(' ')[0])")
+        self.assertEqual(order[0], "scard")                                                  # сверху карточки предметов, не посещаемость
+        self.assertEqual(order[-1], "card")                                                  # а посещаемость в самом низу
         after = page.evaluate("""() => { const att = document.querySelector('#main .att'), last = [...document.querySelectorAll('#main .cards2')].pop();
             return !!(last.compareDocumentPosition(att) & Node.DOCUMENT_POSITION_FOLLOWING); }""")
         self.assertTrue(after)
@@ -186,18 +185,18 @@ def years_with_average(average, subject="Математика"):
 
 class MarkCardTests(MarksUiBase):
     def card(self, page, work):
-        page.click(f'.row[data-mark]:has-text("{work}")')
+        key = page.evaluate("(w) => allMarks().find((m) => m.work === w).key", work)                       # оценка в карточке предмета на вкладке «Оценки»
+        page.click(f'#main [data-mark="{key}"]')
         page.wait_for_selector("#modal .markmodal")
         return page.inner_text("#modal .markmodal")
 
     def test_card_shows_what_for_teacher_theme_mark_and_average(self):
         page = self.open(page_data(math_days(), TEACHERS, years_with_average("3,33")))
         text = self.card(page, "Контрольная работа")
-        for needle in ("Математика", "Контрольная работа, 8 октября", "Учитель: Петрова Мария Петровна", "Тема урока:", "Проценты", "Оценка", "Средний балл", "3,33"):
+        for needle in ("Математика", "Контрольная работа", "Выставлено 8 октября за урок 8 октября", "Учитель: Петрова Мария Петровна", "Тема урока:", "Проценты", "Ваша оценка", "ср. балл", "3,33"):
             self.assertIn(needle, text)
         self.assertEqual(page.inner_text("#modal .mm-big"), "5")
         self.assertIn("m5", page.get_attribute("#modal .mm-big", "class"))
-        self.assertIn("по предмету за этот период", text)                                    # средний балл взят с сайта
         self.assertIn("↑", page.inner_text("#modal .mm-avg"))                                # пятёрка подняла средний балл
         self.assertEqual(self.errors, [])
 
@@ -205,18 +204,17 @@ class MarkCardTests(MarksUiBase):
         page = self.open(page_data(math_days(), TEACHERS, years_with_average("3,33")))
         self.card(page, "Контрольная работа")
         self.assertIn("↑", page.inner_text("#modal .mm-avg"))
-        page.click("#modal [data-mark-close] >> nth=1")
+        page.click("#modal .mm-x")
         self.card(page, "Домашняя работа")                                                   # двойка при среднем 4 (3 и 5)
         self.assertIn("↓", page.inner_text("#modal .mm-avg"))
-        page.click("#modal [data-mark-close] >> nth=1")
+        page.click("#modal .mm-x")
         self.card(page, "Ответ на уроке")                                                    # самая первая оценка: сравнивать не с чем
         self.assertNotRegex(page.inner_text("#modal .mm-avg"), "[↑↓]")
 
     def test_average_is_computed_when_the_site_gave_none(self):
         page = self.open(page_data(math_days(), TEACHERS, years_with_average(None)))
-        text = self.card(page, "Контрольная работа")
+        self.card(page, "Контрольная работа")
         self.assertIn("3,33", page.inner_text("#modal .mm-avg"))                             # (3 + 5 + 2) / 3
-        self.assertIn("по всем оценкам по предмету", text)
 
     def test_card_without_teacher_or_theme_has_no_empty_lines(self):
         days = math_days(theme="")
@@ -233,11 +231,9 @@ class MarkCardTests(MarksUiBase):
 
     def test_card_closes_by_button_cross_escape_and_backdrop(self):
         page = self.open(page_data(math_days(), TEACHERS, years_with_average("3,33")))
-        for how in ("button", "cross", "escape", "backdrop"):
+        for how in ("cross", "escape", "backdrop"):
             self.card(page, "Контрольная работа")
-            if how == "button":
-                page.click("#modal .mbtns [data-mark-close]")
-            elif how == "cross":
+            if how == "cross":
                 page.click("#modal .mm-x")
             elif how == "escape":
                 page.keyboard.press("Escape")
@@ -261,7 +257,7 @@ class MarkCardTests(MarksUiBase):
         page.locator('#main .chips [data-mark]').nth(2).focus()                               # страница перерисована: элемент ищем заново
         page.keyboard.press(" ")
         page.wait_for_selector("#modal .markmodal")
-        self.assertEqual(page.inner_text("#modal .mm-big"), "2")
+        self.assertEqual(page.inner_text("#modal .mm-big"), "3")                              # оценки в карточке предмета идут от новых к старым: 2, 5, 3
 
     def test_term_chips_in_years_view_stay_plain(self):
         """В «Годах и итогах» оценки приходят списком без дат и тем, показывать там нечего: нажатия не нужны."""
@@ -276,7 +272,7 @@ class MarkCardTests(MarksUiBase):
         days = math_days(theme=evil)
         days[1]["lessons"][0]["marks"][0]["work"] = evil
         page = self.open(page_data(days, teachers, years_with_average("3,33")))
-        page.click('.row[data-mark] >> nth=0')
+        page.click('#main .chips [data-mark] >> nth=1')
         page.wait_for_selector("#modal .markmodal")
         self.assertEqual(page.eval_on_selector_all("#modal img, #modal script", "e => e.length"), 0)
         self.assertIsNone(page.evaluate("window.__pwned"))
@@ -291,14 +287,14 @@ class MarkCardTests(MarksUiBase):
 
     def test_card_is_reachable_from_recent_marks_in_other_tabs(self):
         page = self.open(page_data(math_days(), TEACHERS, years_with_average("3,33")), tab="hw")
-        if page.query_selector(".aside .row[data-mark]"):                                    # на широком экране «Последние оценки» рядом с домашкой
-            page.click(".aside .row[data-mark] >> nth=0")
-            page.wait_for_selector("#modal .markmodal")
+        page.click(".rstrip [data-mark] >> nth=0")                                           # на главной: лента «Последние оценки»
+        page.wait_for_selector("#modal .markmodal")
 
     def test_card_fits_on_a_small_phone_without_horizontal_scroll(self):
         page = self.open(page_data(math_days(), TEACHERS, years_with_average("3,33")))
         page.set_viewport_size({"width": 320, "height": 640})
         self.card(page, "Контрольная работа")
+        page.wait_for_timeout(500)                                                           # шторка выезжает снизу: меряем, когда доехала
         box = page.eval_on_selector("#modal .markmodal", "e => { const r = e.getBoundingClientRect(); return [r.left, r.right, innerWidth, r.bottom, innerHeight]; }")
         self.assertGreaterEqual(box[0], 0)
         self.assertLessEqual(box[1], box[2])

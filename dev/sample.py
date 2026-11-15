@@ -20,11 +20,50 @@ SKILL = {"Рус. язык": 3.4, "Математика": 3.6, "История":
          "Физкультура": 4.9, "География": 4.8, "Биология": 4.7, "Труд": 4.9, "ОПД": 5.0, "Род.язык": 3.5, "РоВ": 0}
 
 
+CLASSES = ["5Б", "5А"]
+
+
+def make_rating(rnd):
+    """Список параллели и рейтинг по предметам: выдуманные места, без настоящих людей."""
+    def board(me_place):
+        rows, mark = [], 4.95
+        for i in range(1, 69):
+            mark = round(mark - rnd.random() * 0.03, 2)
+            cls_i = 1 if i % 2 else 0
+            rows.append([i, cls_i, f"{mark:.2f}".replace(".", ","), rnd.choice(["", "+0,01", "-0,02", "+0,04"]), 0, 0, rnd.randint(1, 22)])
+        k = 0
+        for r in rows:
+            if r[1] == 1:
+                k += 1
+                r[4] = k
+        me = rows[me_place - 1]
+        me[1], me[5], me[6] = 1, 1, 0
+        return rows, me
+    main, me = board(35)
+    me[4] = sum(1 for r in main[:35] if r[1] == 1)
+    subjects = []
+    names = [("Англ. язык", 1, "Good", []), ("Музыка", 1, "Good", []), ("Труд", 23, "Bad", []), ("Математика", 47, "Good", ["В следующий раз покорим новые вершины!"]),
+             ("Литература", 54, "Good", ["Получите ", [5, 12], ", чтобы повысить балл до пятерки"]),
+             ("Рус. язык", 59, "Average", ["Получите ", [5, 6], " или ", [4, 20], ", чтобы повысить балл до четверки"]),
+             ("Род.язык", 54, "Good", ["Обратите внимание, по этому предмету мало оценок"])]
+    for name, place, md, hint in names:
+        b, mine = board(place)
+        subjects.append({"id": f"s-{name}", "name": name, "trend": "same", "place": place, "classPlace": max(1, place // 2), "mark": "4,20", "change": "+0,05" if place % 2 else "-0,07",
+                         "mood": md, "hint": hint or ["Идеальный результат, так держать!🔥"], "board": b})
+    today = date.today()
+    history = [{"d": (today - timedelta(days=k)).isoformat(), "c": me[4] + (k // 5) % 3, "p": 35 + (k // 4) % 4 - 1, "k": 2 if k > 10 else 1,
+                "s": {x["name"]: [x["classPlace"] + (k // 6) % 2, x["place"] + (k // 7) % 3, 2 if k > 12 else 1] for x in subjects}}
+               for k in range(21, 0, -1)]
+    return {"period": "1 триместр", "history": history, "class": {"place": me[4], "trend": "up", "total": 34, "mark": "4,42", "change": "+0,01"},
+            "parallel": {"place": 35, "trend": "same", "total": 68, "mark": "4,42", "change": "+0,01"},
+            "classes": CLASSES, "board": main, "subjects": subjects}
+
+
 def make_sample(today=None, seed=7):
     rnd = random.Random(seed)
     today = today or date.today()
     start = today - timedelta(days=today.weekday()) - timedelta(weeks=6)
-    days = []
+    days, ids = [], []
     for i in range(9 * 7):
         d = start + timedelta(days=i)
         if d.weekday() > 4:
@@ -35,8 +74,9 @@ def make_sample(today=None, seed=7):
             marks = []
             if d <= today and SKILL.get(subj) and rnd.random() < 0.35:
                 v = max(2, min(5, round(rnd.gauss(SKILL[subj], 0.8))))
-                marks.append({"value": str(v), "work": "Ответ на уроке",
-                              "created": datetime(d.year, d.month, d.day, 12, 0).isoformat()})
+                marks.append({"value": str(v), "work": rnd.choice(["Ответ на уроке", "Самостоятельная работа", "Практическая работа"]),
+                              "created": datetime(d.year, d.month, d.day, 12, 0).isoformat(), "id": f"{9000 + len(ids)}"})
+                ids.append(subj)
             lessons.append({
                 "n": n, "start": s, "end": e, "subject": subj, "subjectId": f"s-{subj}", "groupId": "g1",
                 "theme": f"Тема урока ({subj})", "homework": rnd.choice(HOMEWORK.get(subj, ["-"])),
@@ -72,6 +112,9 @@ def make_sample(today=None, seed=7):
         "days": days,
         "student": {"name": "Аня", "school": 'МБОУ "Школа № 1"', "class": "5А"},
         "teachers": teachers,
+        "rating": make_rating(rnd),
+        "markInfo": {m["id"]: {"cm": [["5", 12, "Good"], ["4", 9, "Good"], ["3", 6, "Average"], ["2", 1, "Bad"]], "avg": "4,2", "tr": "up", "mood": "Good", "pc": 5, "pp": 21}
+                     for d in days for l in d["lessons"] for m in l["marks"]},
         "years": [
             {"year": 2026, "label": "2026/2027", "className": "5А", "periodLabel": "тр", "columns": 3, "current": True,
              "terms": cur_terms, "final": [{"name": n, "periods": [None, None, None], "year": None} for n in subjects]},

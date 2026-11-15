@@ -44,14 +44,15 @@ class UiSmokeTests(unittest.TestCase):
     def check_tabs(self, width, height):
         page, errors = self.open(width, height)
         self.assertIn("Тест", page.inner_text("#hello"))   # имя из demo-настроек
-        for tab, needle in [("hw", "Домашка"), ("marks", "По предметам"), ("plan", "урок")]:
+        for tab, needle in [("hw", "Домашка"), ("marks", "Ср. балл"), ("plan", "урок")]:
             page.click(f'nav.tabs button[data-tab="{tab}"]')
             page.wait_for_timeout(150)
             text = page.inner_text("#main")
             self.assertTrue(len(text) > 50, f"вкладка {tab} пустая")
             if tab == "marks":
                 self.assertIn(needle, text)
-                for gone in ("Рейтинг", "Как у тебя дела", "средний балл", "пятёрок"):
+                self.assertIn("Рейтинг", text)     # возвращён по просьбе (0.22): места берутся с сайта, в демо выдуманные
+                for gone in ("Как у тебя дела", "пятёрок"):
                     self.assertNotIn(gone, text)   # эти блоки убраны по просьбе
         # нет горизонтальной прокрутки
         self.assertLessEqual(page.evaluate("document.documentElement.scrollWidth"), width + 1)
@@ -560,7 +561,7 @@ class UiSmokeTests(unittest.TestCase):
         page, errors = self.mocked(d)
         page.click('nav.tabs button[data-tab="marks"]')
         self.assertIsNone(page.query_selector("[data-mview]"))             # без данных по годам переключателя нет
-        self.assertIn("По предметам", page.inner_text("#main"))
+        self.assertIn("Ср. балл", page.inner_text("#main"))
         self.assertEqual(page.inner_text("#who"), "")
         self.assertEqual(errors, [])
 
@@ -942,6 +943,7 @@ class UiSmokeTests(unittest.TestCase):
             tops = {}
             for tab in ("hw", "marks", "plan"):
                 page.click(f'nav.tabs button[data-tab="{tab}"]')
+                page.wait_for_timeout(500)                                               # карточки въезжают снизу: меряем, когда встали на место
                 tops[tab] = page.evaluate("document.querySelector('main .grid > div > :first-child').getBoundingClientRect().top - document.querySelector('header').getBoundingClientRect().bottom")
             self.assertEqual(len({round(v) for v in tops.values()}), 1, f"верх экранов разный на {w}px: {tops}")
             self.assertGreaterEqual(min(tops.values()), 8)
@@ -980,11 +982,11 @@ class UiSmokeTests(unittest.TestCase):
         for short in ("нояб.", "окт.", "дек.", "сен.", "янв.", "фев.", "апр.", "авг."):
             self.assertNotIn(short, text)
         self.assertRegex(page.inner_text(".dtitle"), r"^[а-я]{6,11}, \d{1,2} [а-я]{3,8}")        # «четверг, 12 ноября», не «чт, 12 нояб.»
-        self.assertRegex(page.inner_text("#updated"), r"Обновлено \d{1,2} [а-я]{3,8} в")
+        self.assertRegex(page.inner_text("#updated"), r"Обновлено (сегодня|вчера|\d{1,2} [а-я]{3,8}) в")
         page.click('nav.tabs button[data-tab="plan"]')
         self.assertNotRegex(page.inner_text(".nav .ttl small"), r"\.")
-        page.click('nav.tabs button[data-tab="marks"]')
-        self.assertNotIn(".", page.inner_text(".row .t span").split("·")[0])
+        page.click('nav.tabs button[data-tab="hw"]')
+        self.assertNotIn(".", page.inner_text(".rtile2 small").split(",")[1])                    # «за 13 ноября», не «за 13 нояб.»
         self.assertEqual(errors, [])
 
 

@@ -67,7 +67,8 @@ def norm_day(d):
         marks = []
         for w in l.get("workMarks") or []:
             for m in w.get("marks") or []:
-                marks.append({"value": m.get("value"), "work": w.get("workName"), "created": m.get("createdDate")})
+                marks.append({"value": m.get("value"), "work": w.get("workName"), "created": m.get("createdDate"),
+                              **({"id": str(m["id"])} if re.fullmatch(r"\d+", str(m.get("id") or "")) else {})})
         lessons.append({
             "n": l.get("number"), "start": start, "end": end, "lessonId": str(l.get("id") or ""),
             "subject": (l.get("subject") or {}).get("name", "?"),
@@ -405,6 +406,362 @@ def fetch_study_info(client, ids, old_years=None, now=None):
     return student, years
 
 
+# ---------------------------------------------------------------- рейтинг и подробности оценок
+# Всё, что Дневник.ру сам показывает ученику на страницах «Рейтинг» и в карточке оценки. Закрытое подпиской (isRestricted)
+# не берётся. Других учеников в списках знаем только по месту, классу, среднему баллу и номеру зверька-аватарки: ни имён, ни фото.
+RATING_EVERY_HOURS = 1              # рейтинг пересчитывается вместе с оценками: раз в час и при новых оценках
+MARKS_PER_RUN = 15                  # подробностей оценок за одно обновление не больше (остальные в следующий раз)
+MARKS_RECENT_DAYS = 7               # свежие оценки перезапрашиваем: класс ещё получает оценки за ту же работу
+MARKS_REFRESH_HOURS = 6
+MARKS_FORMAT = 1                    # номер формата marks.json: при смене номера оценок в дневнике перезапрашиваем
+RATING_TREND = {"Up": "up", "Down": "down", "Equal": "same"}
+RATING_STATE_MARK = "__RATINGS__INITIAL__STATE__ = "
+
+
+def _open(x):
+    """Сайт показывает это значение (не закрыто подпиской). Закрытое не берём и не угадываем."""
+    return not (((x or {}).get("metadata")) or {}).get("isRestricted")
+
+
+def _num(x):
+    return x if isinstance(x, int) and not isinstance(x, bool) and x > 0 else None
+
+
+def _trend(x):
+    if isinstance(x, dict):
+        x = x.get("value")
+    return RATING_TREND.get(x, "same")
+
+
+def _change(x):
+    """«+ 0,03» -> «+0,03»; всё, что не похоже на число, отбрасываем."""
+    v = ((x or {}).get("value")) if isinstance(x, dict) else None
+    if isinstance(v, str) and re.fullmatch(r"[+\-−]?\s?\d+([,.]\d+)?", v.strip()):
+        return v.replace(" ", "").replace("−", "-")
+    return ""
+
+
+def _mood(x):
+    return x if x in ("Good", "Average", "Bad") else ""
+
+
+def parse_rating_state(html):
+    """Данные страницы рейтинга («/statistics»): из них берём «из скольких», средний балл и список параллели. None, если их там нет."""
+    i = html.find(RATING_STATE_MARK)
+    if i < 0:
+        return None
+    try:
+        state, _ = json.JSONDecoder().raw_decode(html[i + len(RATING_STATE_MARK):])
+    except ValueError:
+        return None
+    return state if isinstance(state, dict) else None
+
+
+def parse_board(block, me_id, classes):
+    """Список параллели: строки [место в параллели, номер класса в classes, средний балл, изменение, место в классе (0 нет), это ученик (0/1), зверёк].
+    Имён и фото нет. classes пополняется названиями классов."""
+    out = []
+    for e in (block or {}).get("rankingPlaces") or []:
+        place = _num((e.get("ranking") or {}).get("place")) if _open(e.get("ranking")) else None
+        if not place:
+            continue
+        line = e.get("ratingLine") or {}
+        g = clean(line.get("groupName"))
+        if g not in classes:
+            classes.append(g)
+        mark = (e.get("averageMark") or {}).get("mark")
+        mark = mark[:6] if _open(e.get("averageMark")) and isinstance(mark, str) else ""
+        cp = (e.get("contextGroupRanking") or {})
+        cplace = _num(cp.get("place")) if _open(cp) else None
+        me = bool(e.get("isContextUser") or (me_id and str((e.get("contextPerson") or {}).get("id") or "") == me_id))
+        am = re.search(r"/(\d{1,3})\.\w+$", str(line.get("imageUrl") or ""))
+        out.append([place, classes.index(g), mark, _change(e.get("averageMarkChange")), cplace or 0, 1 if me else 0, int(am.group(1)) if am else 0])
+    return out
+
+
+def parse_hint(blocks):
+    """Подсказка сайта («Получите 6×5 или 20×4, чтобы…»): список кусочков, строка или [оценка, сколько]."""
+    out = []
+    for b in blocks or []:
+        if isinstance(b.get("text"), str) and b["text"].strip():
+            out.append(re.sub(r"\s+", " ", b["text"])[:140])        # пробелы по краям нужны: куски склеиваются в одну фразу
+        for k in ("mark1", "mark2"):
+            m = b.get(k)
+            if isinstance(m, dict) and _open(m) and _num(m.get("count")) and isinstance(m.get("value"), int):
+                out.append([m["value"], m["count"]])
+    return out
+
+
+def parse_subject_page(r, me_id, classes):
+    """Рейтинг по одному предмету (/ratings/subject): места, список параллели, средний балл, цвет и подсказка сайта."""
+    r = r or {}
+    info = r.get("commonSubjectInformation") or {}
+    avg = r.get("averageMark") or {}
+    out = {"board": parse_board(r.get("commonRating"), me_id, classes)}
+    if _open(info):
+        out["classPlace"] = _num(info.get("groupRatingPlace")) or 0
+        out["place"] = _num(info.get("parallelRatingPlace")) or 0
+    if _open(avg) and isinstance(avg.get("value"), str):
+        out["mark"], out["mood"] = avg["value"][:6], _mood(avg.get("mood"))
+    corr = r.get("marksCorrection") or {}
+    if _open(corr):
+        out["hint"] = parse_hint(corr.get("blocks"))
+    return out
+
+
+def parse_rating(feed, state=None, names=None, subject_pages=None):
+    """Рейтинг самого ученика: плитки «в классе» и «в параллели», список параллели и по каждому предмету.
+
+    feed: ответ «/ratings/feed-widget»; state: данные страницы рейтинга («из скольких», средний балл, список параллели, предметы);
+    names: номер предмета -> название, как в дневнике; subject_pages: номер предмета -> ответ «/ratings/subject».
+    Значения, закрытые подпиской, пропускаем. None, если брать нечего."""
+    feed, state, names, subject_pages = feed or {}, state or {}, names or {}, subject_pages or {}
+    me = str(state.get("childPersonId") or "")
+    info = state.get("commonInformation") or {}
+    classes = []
+
+    def mine(block):
+        for e in (block or {}).get("rankingPlaces") or []:
+            if e.get("isContextUser") or (me and str((e.get("contextPerson") or {}).get("id") or "") == me):
+                return e
+        return None
+
+    board = parse_board(state.get("commonRating"), me, classes)
+    me_parallel = mine(state.get("commonRating"))
+    my_class = ((me_parallel or {}).get("ratingLine") or {}).get("groupName")
+    class_total = sum(1 for e in (state.get("commonRating") or {}).get("rankingPlaces") or [] if my_class and (e.get("ratingLine") or {}).get("groupName") == my_class)
+
+    def side(event, rank_key, block_key, info_key, total):
+        place = None
+        rank = (event or {}).get(rank_key)
+        if rank and _open(rank):
+            place = _num(rank.get("place"))
+        e = mine(state.get(block_key))
+        if place is None and e and _open(e.get("ranking")):
+            place = _num((e.get("ranking") or {}).get("place"))
+        if place is None and _open(info):
+            place = _num(info.get(info_key))
+        if place is None:
+            return None
+        out = {"place": place, "trend": _trend((event or {}).get("trend"))}
+        if total and total >= place:
+            out["total"] = total
+        if e:
+            if _open(e.get("averageMark")) and isinstance(e["averageMark"].get("mark"), str):
+                out["mark"] = e["averageMark"]["mark"][:6]
+            change = _change(e.get("averageMarkChange"))
+            if change:
+                out["change"] = change
+        return out
+
+    out = {"class": side(feed.get("commonGroupRatingEvent"), "groupRanking", "groupRating", "groupRatingPlace", class_total),
+           "parallel": side(feed.get("commonParallelRatingEvent"), "parallelRanking", "parallelRating", "parallelRatingPlace",
+                            len(board) if me_parallel else 0),
+           "subjects": []}
+    trends = {str((e.get("subject") or {}).get("id")): _trend(e.get("trend")) for e in feed.get("personalRatingBySubjectEvents") or []}
+    feed_place = {str((e.get("subject") or {}).get("id")): _num((e.get("place") or {}).get("value")) if _open(e.get("place")) else None
+                  for e in feed.get("personalRatingBySubjectEvents") or []}
+    top = (state.get("subjectTop") or {}).get("subjects") or []
+    listed = [(str((t.get("subject") or {}).get("id")), t) for t in top if isinstance(t, dict)]
+    seen = {sid for sid, _ in listed}
+    for e in feed.get("personalRatingBySubjectEvents") or []:       # предмет есть в «Ленте», но нет в списке страницы
+        sid = str((e.get("subject") or {}).get("id"))
+        if sid not in seen:
+            listed.append((sid, {"subject": e.get("subject")}))              # место в параллели тут неизвестно: в «Ленте» только место в классе
+    for sid, t in listed:
+        name = names.get(sid) or clean((t.get("subject") or {}).get("name"))
+        if not name:
+            continue
+        sub = {"id": sid, "name": name, "trend": trends.get(sid, "same")}
+        page = parse_subject_page(subject_pages.get(sid), me, classes) if sid in subject_pages else {}
+        place = _num((t.get("ranking") or {}).get("place")) if _open(t.get("ranking")) else None
+        place = place or page.get("place") or None
+        cplace = page.get("classPlace") or feed_place.get(sid)
+        if not place and not cplace:
+            continue
+        if place:
+            sub["place"] = place
+        if cplace:
+            sub["classPlace"] = cplace
+        am = t.get("averageMark") or {}
+        mark = page.get("mark") or (am.get("mark")[:6] if _open(am) and isinstance(am.get("mark"), str) else "")
+        if mark:
+            sub["mark"] = mark
+        change = _change(t.get("averageMarkChange"))
+        if change:
+            sub["change"] = change
+        if page.get("mood"):
+            sub["mood"] = page["mood"]
+        if page.get("hint"):
+            sub["hint"] = page["hint"]
+        if page.get("board"):
+            sub["board"] = page["board"]
+        out["subjects"].append(sub)
+    out["classes"] = classes
+    if board:
+        out["board"] = board
+    m = re.search(r"\(([^()]{1,40})\)\s*$", clean((state.get("ratingDescription") or {}).get("body")))
+    if m:
+        out["period"] = m.group(1)
+    return out if (out["class"] or out["parallel"] or out["subjects"]) else None
+
+
+
+# История мест: сайт показывает только сегодняшние места, поэтому прежние копим сами (раз в день, в пределах учебного периода)
+RATING_HISTORY_KEEP = 120
+
+
+def _avg_num(x):
+    try:
+        return float(str(x).replace(",", "."))
+    except (TypeError, ValueError):
+        return None
+
+
+def class_places(board):
+    """Места классов параллели по среднему баллу их учеников (как «Рейтинг → Классы» в приложении): ({класс: место}, {класс: средний})."""
+    marks = {}
+    for r in board or []:
+        v = _avg_num(r[2]) if len(r) > 2 else None
+        if v is not None:
+            marks.setdefault(r[1], []).append(v)
+    avgs = {c: round(sum(v) / len(v), 2) for c, v in marks.items() if v}
+    places, last, place = {}, None, 0
+    for i, c in enumerate(sorted(avgs, key=lambda c: (-avgs[c], c))):
+        if avgs[c] != last:
+            place, last = i + 1, avgs[c]
+        places[c] = place
+    return places, avgs
+
+
+def rating_snapshot(rating, day):
+    """Одна запись истории: места ученика (в классе, в параллели), место его класса и то же по каждому предмету."""
+    board = rating.get("board") or []
+    me = next((r for r in board if len(r) > 5 and r[5]), None)
+    snap = {"d": day.isoformat()}
+    if (rating.get("class") or {}).get("place"):
+        snap["c"] = rating["class"]["place"]
+    if (rating.get("parallel") or {}).get("place"):
+        snap["p"] = rating["parallel"]["place"]
+    if me is not None:
+        snap["k"] = class_places(board)[0].get(me[1], 0)
+    subs = {}
+    for sub in rating.get("subjects") or []:
+        b = sub.get("board") or []
+        mine = next((r for r in b if len(r) > 5 and r[5]), None)
+        subs[sub["name"]] = [sub.get("classPlace") or 0, sub.get("place") or 0, class_places(b)[0].get(mine[1], 0) if mine else 0]
+    if subs:
+        snap["s"] = subs
+    return snap
+
+
+def update_rating_history(path, rating, day):
+    """Дописывает (или заменяет сегодняшнюю) запись. С новым учебным периодом история начинается заново, как в приложении."""
+    hist = read_json(path, {}) or {}
+    period = (rating or {}).get("period") or ""
+    items = hist.get("items") if isinstance(hist.get("items"), list) and hist.get("period") == period else []
+    if not rating or not (rating.get("class") or rating.get("parallel") or rating.get("subjects")):
+        return items
+    snap = rating_snapshot(rating, day)
+    items = [x for x in items if x.get("d") != snap["d"]] + [snap]
+    items = sorted(items, key=lambda x: x["d"])[-RATING_HISTORY_KEEP:]
+    new = {"period": period, "items": items}
+    if new != hist:
+        write_private(path, json.dumps(new, ensure_ascii=False))
+    return items
+
+
+def current_group(client, ids):
+    """Номер текущего класса ученика на сайте (нужен для запросов рейтинга)."""
+    html = client.page(f"/marks/school/{ids['schoolId']}/student/{ids['personId']}/period")
+    _, groups = parse_student(html, ids)
+    return groups[0]["groupId"] if groups else None
+
+
+def fetch_rating(client, ids, names=None, gid=None):
+    """Рейтинг ученика с сайта: то, что сайт сам показывает в «Ленте» и на странице «Рейтинг». Закрытое подпиской не получаем."""
+    gid = gid or current_group(client, ids)
+    if not gid:
+        return None
+    pid = ids["personId"]
+    feed = client.json(f"/ratings/feed-widget?groupId={gid}&childPersonId={pid}&page=userfeed")
+    state = None
+    try:
+        state = parse_rating_state(client.page(f"/statistics?childPersonId={pid}&groupId={gid}&subjectId=0&isGroup=True"))
+    except NeedLogin:
+        raise
+    except Exception:
+        pass                    # без этой страницы остаются места из «Ленты», только без «из скольких» и списка параллели
+    pages = {}
+    sids = [str((t.get("subject") or {}).get("id")) for t in ((state or {}).get("subjectTop") or {}).get("subjects") or [] if isinstance(t, dict)]
+    sids += [str((e.get("subject") or {}).get("id")) for e in feed.get("personalRatingBySubjectEvents") or []]
+    for sid in dict.fromkeys(sids):
+        try:
+            pages[sid] = client.json(f"/ratings/subject?childPersonId={pid}&groupId={gid}&subjectId={sid}")
+        except NeedLogin:
+            raise
+        except Exception:
+            pass                # по этому предмету останется только место в параллели
+    return parse_rating(feed, state, names, pages)
+
+
+def parse_mark_details(r):
+    """Карточка оценки с сайта: как справился класс (сколько учеников какую оценку получили), места по предмету."""
+    r = r or {}
+    out = {}
+    cm = []
+    for i in ((r.get("classmatesMarks") or {}).get("items")) or []:
+        if _open(i) and isinstance(i.get("value"), str) and _num(i.get("studentCount")):
+            cm.append([clean(i["value"])[:4], i["studentCount"], _mood(i.get("mood"))])
+    if cm:
+        out["cm"] = cm
+    avg = (r.get("subject") or {}).get("averageMark") or {}
+    if isinstance(avg.get("value"), str):
+        out["avg"], out["tr"], out["mood"] = avg["value"][:6], _trend({"value": avg.get("trend")}), _mood(avg.get("mood"))
+    for key, w in (("pc", "subjectGroupRatingWidget"), ("pp", "subjectParallelRatingWidget")):
+        pl = _num((r.get(w) or {}).get("place")) if _open(r.get(w)) else None
+        if pl:
+            out[key] = pl
+    return out
+
+
+def marks_pending(history, store, now, limit=MARKS_PER_RUN):
+    """Номера оценок, по которым нужны подробности: новые и (для свежих) давно не обновлявшиеся, сначала самые новые."""
+    todo = []
+    for d in history.values():
+        for l in d["lessons"]:
+            for m in l.get("marks") or []:
+                mid = m.get("id")
+                if not mid:
+                    continue
+                have = store.get(mid)
+                created = str(m.get("created") or d["date"])[:10]
+                recent = (date.fromisoformat(d["date"]) >= date.fromtimestamp(now) - timedelta(days=MARKS_RECENT_DAYS)) if d.get("date") else False
+                if have is None or (recent and now - have.get("at", 0) >= MARKS_REFRESH_HOURS * 3600):
+                    todo.append((created, mid))
+    todo.sort(reverse=True)
+    return [mid for _, mid in todo[:limit]]
+
+
+def fetch_mark_details(client, ids, gid, history, store, now=None, limit=MARKS_PER_RUN):
+    """Дополняет store (номер оценки -> подробности). Сбой по одной оценке не мешает остальным; вход истёк -> NeedLogin."""
+    now = now or time.time()
+    for mid in marks_pending(history, store, now, limit):
+        try:
+            r = client.json(f"/ratings/marks-details?childPersonId={ids['personId']}&groupId={gid}&markId={mid}")
+        except NeedLogin:
+            raise
+        except Exception:
+            continue
+        det = parse_mark_details(r)
+        det["at"] = int(now)
+        store[mid] = det
+    present = {m.get("id") for d in history.values() for l in d["lessons"] for m in l.get("marks") or []}
+    for mid in [k for k in store if k not in present]:
+        del store[mid]
+    return store
+
+
 # ---------------------------------------------------------------- учителя
 TEACHERS_EVERY_HOURS = 24 * 7       # учителя меняются редко: раз в неделю
 TEACHERS_PER_RUN = 20               # за один раз не больше 20 запросов к сайту
@@ -466,7 +823,7 @@ def fetch_teachers(client, ids, history, old=None, now=None):
 
 
 # ---------------------------------------------------------------- выход из аккаунта
-LOGOUT_FILES = ["session.json", "credentials.json", "ids.json", "history.json", "student.json", "years.json", "teachers.json",
+LOGOUT_FILES = ["session.json", "credentials.json", "ids.json", "history.json", "student.json", "years.json", "teachers.json", "rating.json", "marks.json", "rating-history.json",
                 "login-state.json"]
 BACKUP_KEEP = 24 * 3600        # после выхода прежний вход можно вернуть в течение суток
 LOGOUT_MIN_WAIT = 2            # второе подтверждение раньше, чем через 2 секунды, не принимается
@@ -668,7 +1025,7 @@ def read_json(path, default):
         return default
 
 
-def public_payload(history, updated_at, status, cfg=None, version=None, student=None, years=None, teachers=None):
+def public_payload(history, updated_at, status, cfg=None, version=None, student=None, years=None, teachers=None, rating=None, mark_info=None, rating_history=None):
     days = [history[k] for k in sorted(history)]
     out = {"updatedAt": updated_at, "days": days, "status": status, "config": cfg or {}}
     if student:
@@ -677,6 +1034,13 @@ def public_payload(history, updated_at, status, cfg=None, version=None, student=
         out["years"] = years
     if teachers and teachers.get("bySubject"):
         out["teachers"] = teachers["bySubject"]
+    if rating:
+        out["rating"] = dict(rating, history=rating_history[-60:]) if rating_history else rating
+    if mark_info:
+        ids_now = {m.get("id") for d in history.values() for l in d["lessons"] for m in l.get("marks") or []}
+        info = {k: {a: b for a, b in v.items() if a != "at"} for k, v in mark_info.items() if k in ids_now}
+        if info:
+            out["markInfo"] = info
     if version:
         out["version"] = version
     return out
@@ -725,10 +1089,16 @@ def sync(data_dir, out_path, base=BASE, today=None, session_save_hours=0, config
     purge_old_backup(data_dir)
     student_path, years_path, teachers_path = data_dir / "student.json", data_dir / "years.json", data_dir / "teachers.json"
     student, years, teachers = read_json(student_path, None), read_json(years_path, None), read_json(teachers_path, None)
+    rating_path, marks_path = data_dir / "rating.json", data_dir / "marks.json"
+    rating = read_json(rating_path, None)
+    rhist_path = data_dir / "rating-history.json"
+    rating_history = (read_json(rhist_path, {}) or {}).get("items") or []
+    marks_file = read_json(marks_path, {})
+    marks_store = marks_file.get("items") if isinstance(marks_file.get("items"), dict) else {}
 
     def fail(err, kind):
         status = {"needLogin": kind == "login", "error": str(err), "syncing": False, "canRestore": backup_available(data_dir)}
-        write_public(out_path, public_payload(history, updated_prev, status, cfg, version, student, years, teachers))
+        write_public(out_path, public_payload(history, updated_prev, status, cfg, version, student, years, teachers, rating, marks_store, rating_history))
 
     def relogin():
         """Заходит заново по сохранённому логину и паролю."""
@@ -757,7 +1127,8 @@ def sync(data_dir, out_path, base=BASE, today=None, session_save_hours=0, config
         if not ids:
             ids = discover_ids(client, today)
             write_private(ids_path, json.dumps(ids))
-        first = (today - timedelta(days=14)) if history else date(today.year if today.month >= 9 else today.year - 1, 9, 1)
+        ids_known = marks_file.get("v") == MARKS_FORMAT           # у прежних версий оценки сохранены без номеров: один раз перезапрашиваем весь период
+        first = (today - timedelta(days=14)) if history and ids_known else date(today.year if today.month >= 9 else today.year - 1, 9, 1)
         cur = first - timedelta(days=first.weekday())
         while cur <= today + timedelta(days=21):
             for d in client.diary(ids, cur, cur + timedelta(days=7)):
@@ -782,7 +1153,8 @@ def sync(data_dir, out_path, base=BASE, today=None, session_save_hours=0, config
         fail(e, "error")
         raise
 
-    if hashlib.sha256(json.dumps(history, sort_keys=True).encode()).hexdigest() != before:
+    history_changed = hashlib.sha256(json.dumps(history, sort_keys=True).encode()).hexdigest() != before
+    if history_changed:
         write_private(history_path, json.dumps(history, ensure_ascii=False))     # пишем, только если что-то изменилось
     # ученик, школа и итоговые оценки по годам: не чаще раза в 3 часа; сбой не мешает дневнику
     info_age_h = (time.time() - years_path.stat().st_mtime) / 3600 if years_path.exists() and student else 1e9
@@ -810,11 +1182,34 @@ def sync(data_dir, out_path, base=BASE, today=None, session_save_hours=0, config
         teachers = new_teachers
     except Exception:
         pass
+    # рейтинг и подробности оценок: рейтинг раз в час и сразу при новых оценках, подробности по 15 оценок за раз; сбой не мешает дневнику
+    rating_age_h = (time.time() - rating_path.stat().st_mtime) / 3600 if rating_path.exists() else 1e9
+    rating_due = history_changed or rating_age_h >= RATING_EVERY_HOURS
+    marks_due = bool(marks_pending(history, marks_store, time.time()))
+    if rating_due or marks_due or marks_file.get("v") != MARKS_FORMAT:
+        try:
+            ids = read_json(ids_path, None)
+            site = Client(jar, base=base)
+            gid = current_group(site, ids)
+            if rating_due and gid:
+                names = {l["subjectId"]: l["subject"] for d in history.values() for l in d["lessons"] if l.get("subjectId")}
+                new_rating = fetch_rating(site, ids, names, gid) or {}     # {}: сайт рейтинг не отдаёт (нет подписки); помним, чтобы не спрашивать каждый раз
+                if new_rating != (rating or {}) or not rating_path.exists():
+                    write_private(rating_path, json.dumps(new_rating, ensure_ascii=False))
+                else:
+                    os.utime(rating_path)
+                rating = new_rating or None
+                rating_history = update_rating_history(rhist_path, rating, today)
+            if gid:
+                fetch_mark_details(site, ids, gid, history, marks_store)
+            write_private(marks_path, json.dumps({"v": MARKS_FORMAT, "items": marks_store}, ensure_ascii=False))
+        except Exception:
+            pass
     age_h = (time.time() - session_path.stat().st_mtime) / 3600 if session_path.exists() else 1e9
     if relogged or age_h >= session_save_hours:
         write_private(session_path, json.dumps(jar_to_list(jar, also=extra), ensure_ascii=False))
     payload = public_payload(history, datetime.now().isoformat(timespec="seconds"),
-                             {"needLogin": False, "error": None, "syncing": False, "canRestore": False}, cfg, version, student, years, teachers)
+                             {"needLogin": False, "error": None, "syncing": False, "canRestore": False}, cfg, version, student, years, teachers, rating, marks_store, rating_history)
     write_public(out_path, payload)
     return payload
 
@@ -832,4 +1227,7 @@ def rebuild(data_dir, out_path, config_path=None, version_path=None):
     status = {"needLogin": not has_login, "error": None if has_login else "Введите логин и пароль от Дневник.ру.", "syncing": False,
               "canRestore": backup_available(data_dir)}
     write_public(out_path, public_payload(history, updated, status, cfg, version, read_json(data_dir / "student.json", None),
-                                          read_json(data_dir / "years.json", None), read_json(data_dir / "teachers.json", None)))
+                                          read_json(data_dir / "years.json", None), read_json(data_dir / "teachers.json", None),
+                                          read_json(data_dir / "rating.json", None),
+                                          (read_json(data_dir / "marks.json", {}) or {}).get("items"),
+                                          (read_json(data_dir / "rating-history.json", {}) or {}).get("items")))

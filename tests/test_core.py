@@ -113,15 +113,90 @@ TERM_JSON = {"dateStart": 1756684800, "dateFinish": 1764288000, "subjects": [
          {"id": "e1x", "lessonId": "l1", "value": "Б", "fullName": "Пропуск по болезни", "date": "1759708800", "lessonNumber": 2}]}]}
 
 
+# ---------------------------------------------------------------- рейтинг (выдуманные данные в формате сайта)
+def _rank(place, mark="4,40", change="+ 0,02", trend="Up", me=False, group="5А", cp=None, animal=7):
+    row = {"contextPerson": {"id": "1111111111", "avatarUrl": "https://example.org/a.jpg"} if me else None,
+           "isContextUser": me, "ranking": {"place": place, "metadata": {"isRestricted": False}},
+           "averageMark": {"mark": mark, "metadata": {"isRestricted": False}},
+           "averageMarkChange": {"value": change, "trend": trend} if change else None,
+           "ratingLine": {"groupName": group, "scalePercent": 50, "imageUrl": f"https://example.org/animalrating/{animal}.png"}}
+    if cp:
+        row["contextGroupRanking"] = {"place": cp, "metadata": {"isRestricted": False}}
+    return row
+
+
+def parallel_rows():
+    return [_rank(1, group="5Б", animal=3), _rank(2, group="5А", cp=1, animal=4), _rank(3, "4,42", "+ 0,01", "Up", True, "5А", 2, 9),
+            _rank(4, group="5Б", animal=5), _rank(5, group="5А", cp=3, animal=6)]
+
+
+def rating_feed(restricted=False):
+    r = {"isRestricted": restricted}
+    return {
+        "commonGroupRatingEvent": {"trend": {"value": "Up"}, "groupRanking": {"place": 3, "metadata": r}},
+        "commonParallelRatingEvent": {"trend": {"value": "Equal"}, "parallelRanking": {"place": 5, "metadata": r}},
+        "topRatingEvent": {"title": {"value": "Чужая Фамилия попала в топ Литература"}},
+        "personalRatingBySubjectEvents": [
+            {"trend": {"value": "Down"}, "subject": {"id": "s1", "name": "Русский язык"}, "place": {"value": 4, "metadata": r}, "isPro": True},
+            {"trend": {"value": "Up"}, "subject": {"id": "s9", "name": "Музыка"}, "place": {"value": 2, "metadata": {"isRestricted": False}}}]}
+
+
+def rating_state(restricted=False):
+    return {"childPersonId": "1111111111", "isPro": True,
+            "groupRating": {"rankingPlaces": [_rank(2, "4,50", "- 0,03", "Down"), _rank(3, "4,42", "+ 0,01", "Up", True), _rank(3, "4,42")]},
+            "parallelRating": {"rankingPlaces": [_rank(4, group="5Б"), _rank(5, "4,42", "+ 0,01", "Up", True), _rank(5)]},
+            "subjectTop": {"title": "Ваш рейтинг по предметам", "subjects": [
+                {"groupId": "5001", "ranking": {"place": 7, "metadata": {"isRestricted": restricted}}, "subject": {"id": "s1", "name": "Русский язык"},
+                 "averageMark": {"mark": "3,07", "metadata": {"isRestricted": False}}, "averageMarkChange": {"value": "- 0,07", "trend": "Down"}},
+                {"groupId": "5001", "ranking": {"place": 1, "metadata": {"isRestricted": False}}, "subject": {"id": "s9", "name": "Музыка"},
+                 "averageMark": {"mark": "5,00", "metadata": {"isRestricted": False}}, "averageMarkChange": None}]},
+            "commonRating": {"group": {"name": "x"}, "rankingPlaces": parallel_rows()},
+            "commonInformation": {"groupRatingPlace": 3, "parallelRatingPlace": 5, "metadata": {"isRestricted": restricted}},
+            "ratingDescription": {"body": "На основе данных о среднем балле учащихся в параллели (1 триместр)"}}
+
+
+def rating_page(restricted=False):
+    return "<html><script>window.__RATINGS__INITIAL__STATE__ = " + json.dumps(rating_state(restricted), ensure_ascii=False) + ";</script></html>"
+
+
+def subject_page(sid="s1", restricted=False):
+    r = {"isRestricted": restricted}
+    hint = [{"text": "Получите ", "mark1": None, "mark2": None}, {"text": None, "mark1": {"value": 5, "count": 6, "mood": "Good", "metadata": {"isRestricted": False}}, "mark2": None},
+            {"text": " или ", "mark1": None, "mark2": None}, {"text": None, "mark1": None, "mark2": {"value": 4, "count": 20, "mood": "Good", "metadata": {"isRestricted": False}}},
+            {"text": ", чтобы повысить балл до четверки", "mark1": None, "mark2": None}]
+    return {"commonRating": {"group": {"name": "x"}, "rankingPlaces": parallel_rows(), "metadata": r},
+            "marksCorrection": {"blocks": hint, "metadata": r},
+            "averageMark": {"value": "3,07", "mood": "Average", "text": "ср. балл общий", "metadata": r},
+            "commonSubjectInformation": {"firstName": "Аня", "lastName": "Тестова", "groupRatingPlace": 4 if sid == "s1" else 2,
+                                         "parallelRatingPlace": 7 if sid == "s1" else 1, "metadata": r}}
+
+
+def mark_details_json(restricted=False):
+    r = {"isRestricted": restricted}
+    return {"markDetails": {"marks": [{"id": "9001", "value": "5", "mood": "Good"}], "markDateInfoText": "Выставлено 11 нояб. за урок 11 нояб."},
+            "teacher": {"firstName": "Мария", "lastName": "Тестова", "messengerEntryPoint": {"chatJid": None}},
+            "subject": {"id": "s1", "name": "Рус. язык", "averageMark": {"value": "3,07", "trend": "Up", "text": "ср. балл", "mood": "Average"}},
+            "classmatesMarks": {"items": [{"mood": "Good", "studentCount": 18, "markNumber": 0, "value": "5", "percent": 56.25},
+                                          {"mood": "Average", "studentCount": 6, "markNumber": 2, "value": "3", "percent": 18.75}]},
+            "subjectGroupRatingWidget": {"place": 4, "ratingsUrl": "x", "metadata": r}, "subjectParallelRatingWidget": {"place": 7, "ratingsUrl": "x", "metadata": r},
+            "hasActiveSubscription": True}
+
+
+MARK_WORK = [{"workName": "Ответ на уроке", "workId": "w1", "workUrl": "", "marks": [{"id": "9001", "value": "5", "mood": "Good", "createdDate": "2026-11-11T07:00:00"}]}]
+
+
 class FakeSite(http.server.BaseHTTPRequestHandler):
     good_token = "good"
     requests = 0
     login_posts = 0
     only_school = None          # если задано, дневник отдаёт уроки только для этой школы
     paths = []                  # какие адреса просили
+    details_requests = 0
     lesson_requests = 0
     lesson_fails = False
     final_fails = False
+    rating_mode = "ok"          # ok | restricted | fail | nopage (страницы рейтинга нет)
+    with_marks = False          # дневник отдаёт у урока оценку с номером
     captcha = False             # форма входа просит капчу
     password = "secret"
 
@@ -183,6 +258,30 @@ class FakeSite(http.server.BaseHTTPRequestHandler):
             if not authed:
                 return self._send(401, "login")
             return self._send(200, json.dumps(TERM_JSON), "application/json")
+        if path == "/ratings/feed-widget":
+            if not authed:
+                return self._send(401, "login")
+            if FakeSite.rating_mode == "fail":
+                return self._send(500, "oops")
+            return self._send(200, json.dumps(rating_feed(FakeSite.rating_mode == "restricted")), "application/json")
+        if path == "/ratings/subject":
+            if not authed:
+                return self._send(401, "login")
+            if FakeSite.rating_mode == "fail":
+                return self._send(500, "oops")
+            sid = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query).get("subjectId", [""])[0]
+            return self._send(200, json.dumps(subject_page(sid, FakeSite.rating_mode == "restricted")), "application/json")
+        if path == "/ratings/marks-details":
+            if not authed:
+                return self._send(401, "login")
+            FakeSite.details_requests += 1
+            if FakeSite.rating_mode == "fail":
+                return self._send(500, "oops")
+            return self._send(200, json.dumps(mark_details_json(FakeSite.rating_mode == "restricted")), "application/json")
+        if path == "/statistics":
+            if not authed or FakeSite.rating_mode == "nopage":
+                return self._send(401 if not authed else 404, "no")
+            return self._send(200, rating_page(FakeSite.rating_mode == "restricted"))
         if path == "/marks":
             if not authed:
                 return self._send(401, "<html>login</html>")
@@ -194,7 +293,8 @@ class FakeSite(http.server.BaseHTTPRequestHandler):
             return self._send(200, json.dumps({"days": []}), "application/json")
         att = {"text": "читать", "attachments": [{"fileId": "7", "fileName": "ГЕО", "fileExtension": "pdf", "size": 5,
                                                   "fileLink": "https://b5.csdnevnik.ru/geo.pdf"}]}
-        body = json.dumps({"days": [raw_day([raw_lesson(homework=att)]), raw_day([raw_lesson()], day=(2026, 11, 12))]}).encode()
+        marks = {"workMarks": MARK_WORK} if FakeSite.with_marks else {}
+        body = json.dumps({"days": [raw_day([raw_lesson(homework=att, **marks)]), raw_day([raw_lesson()], day=(2026, 11, 12))]}).encode()
         self._send(200, body, "application/json", headers=[("Set-Cookie", "dnevnik_sst=rotated; Path=/; Max-Age=86400; HttpOnly")])
 
 
@@ -644,6 +744,256 @@ class StudyInfoTests(unittest.TestCase):
         saved = json.loads(self.out.read_text())
         self.assertEqual(saved["student"]["school"], 'МБОУ "Школа № 1"')
         self.assertEqual(len(saved["years"]), 2)
+
+
+class RatingTests(unittest.TestCase):
+    """Рейтинг ученика и подробности оценок: только то, что сайт не закрыл подпиской и что не выдаёт других учеников."""
+
+    IDS = {"personId": "1111111111", "schoolId": "2222222222"}
+
+    @classmethod
+    def setUpClass(cls):
+        cls.httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), FakeSite)
+        cls.base = f"http://127.0.0.1:{cls.httpd.server_address[1]}"
+        threading.Thread(target=cls.httpd.serve_forever, daemon=True).start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.httpd.shutdown()
+
+    def setUp(self):
+        FakeSite.good_token, FakeSite.only_school, FakeSite.captcha, FakeSite.password, FakeSite.login_posts = "good", "2222222222", False, "secret", 0
+        FakeSite.paths, FakeSite.final_fails, FakeSite.rating_mode, FakeSite.with_marks, FakeSite.details_requests = [], False, "ok", True, 0
+        FakeSite.lesson_requests, FakeSite.lesson_fails = 0, False
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self.data, self.out = self.root / "data", self.root / "www" / "data.json"
+        self.client = core.Client(core.login_with_password("kate", "secret", self.base + "/login/", self.base), base=self.base)
+
+    def tearDown(self):
+        FakeSite.with_marks = False
+        self.tmp.cleanup()
+
+    def sync(self):
+        return core.sync(self.data, self.out, base=self.base, today=date(2026, 11, 11))
+
+    def requests_to(self, prefix):
+        return [p for p in FakeSite.paths if p.startswith(prefix)]
+
+    def parse(self, restricted=False, pages=True):
+        pg = {"s1": subject_page("s1", restricted), "s9": subject_page("s9", restricted)} if pages else {}
+        return core.parse_rating(rating_feed(restricted), rating_state(restricted), {"s1": "Рус. язык"}, pg)
+
+    # ---- разбор рейтинга
+    def test_places_totals_marks_and_period(self):
+        r = self.parse()
+        self.assertEqual(r["class"], {"place": 3, "trend": "up", "total": 3, "mark": "4,42", "change": "+0,01"})   # в классе 5А трое из пяти в параллели
+        self.assertEqual(r["parallel"], {"place": 5, "trend": "same", "total": 5, "mark": "4,42", "change": "+0,01"})
+        self.assertEqual(r["period"], "1 триместр")
+
+    def test_parallel_board_has_places_classes_marks_and_no_people(self):
+        r = self.parse()
+        self.assertEqual(r["classes"], ["5Б", "5А"])
+        self.assertEqual(r["board"][0], [1, 0, "4,40", "+0,02", 0, 0, 3])              # место, класс, балл, изменение, место в классе, это ученик, зверёк
+        self.assertEqual(r["board"][2], [3, 1, "4,42", "+0,01", 2, 1, 9])              # строка самого ученика помечена
+        self.assertEqual(sum(row[5] for row in r["board"]), 1)
+        text = json.dumps(r, ensure_ascii=False)
+        for foreign in ("Чужая", "Фамилия", "example.org", "avatar", "1111111111", "Тестова", "Аня"):
+            self.assertNotIn(foreign, text)
+
+    def test_subjects_have_names_places_hints_colour_and_boards(self):
+        r = self.parse()
+        rus, music = r["subjects"]
+        self.assertEqual((rus["name"], rus["place"], rus["classPlace"], rus["mark"], rus["change"], rus["mood"], rus["trend"]),
+                         ("Рус. язык", 7, 4, "3,07", "-0,07", "Average", "down"))      # название как в дневнике
+        self.assertEqual(rus["hint"], ["Получите ", [5, 6], " или ", [4, 20], ", чтобы повысить балл до четверки"])
+        self.assertEqual(len(rus["board"]), 5)
+        self.assertEqual((music["name"], music["place"], music["classPlace"], music["mood"]), ("Музыка", 1, 2, "Average"))
+        self.assertNotIn("change", music)
+
+    def test_without_subject_pages_only_the_list_remains(self):
+        r = self.parse(pages=False)
+        self.assertEqual([(s["name"], s["place"]) for s in r["subjects"]], [("Рус. язык", 7), ("Музыка", 1)])
+        self.assertEqual(r["subjects"][0]["classPlace"], 4)                             # место в классе из «Ленты»
+        self.assertNotIn("board", r["subjects"][0])
+
+    def test_places_without_the_statistics_page(self):
+        r = core.parse_rating(rating_feed(), None)
+        self.assertEqual(r["class"], {"place": 3, "trend": "up"})
+        self.assertEqual(r["parallel"]["place"], 5)
+        self.assertEqual([(s["name"], s.get("place"), s["classPlace"]) for s in r["subjects"]], [("Русский язык", None, 4), ("Музыка", None, 2)])
+        self.assertNotIn("period", r)
+        self.assertNotIn("board", r)
+
+    def test_values_closed_by_subscription_are_skipped(self):
+        r = self.parse(restricted=True)
+        self.assertEqual([s["name"] for s in r["subjects"]], ["Музыка"])                # у «Рус. языка» место закрыто: предмета нет
+        self.assertNotIn("hint", r["subjects"][0])                                      # подсказка закрыта: не показываем
+        state = rating_state(restricted=True)
+        state["groupRating"]["rankingPlaces"][1]["ranking"]["metadata"]["isRestricted"] = True
+        state["parallelRating"]["rankingPlaces"][1]["ranking"]["metadata"]["isRestricted"] = True
+        state["subjectTop"]["subjects"][1]["ranking"]["metadata"]["isRestricted"] = True
+        feed = rating_feed(restricted=True)
+        feed["personalRatingBySubjectEvents"] = []
+        self.assertIsNone(core.parse_rating(feed, state))                               # всё закрыто: рейтинга нет
+
+    def test_nothing_to_show(self):
+        self.assertIsNone(core.parse_rating({}, None))
+        self.assertIsNone(core.parse_rating_state("<html>нет данных</html>"))
+        self.assertIsNone(core.parse_rating_state("<script>x = " + core.RATING_STATE_MARK + "{оборвано"))
+
+    def test_odd_values_from_the_site_are_dropped(self):
+        state = rating_state()
+        state["commonRating"]["rankingPlaces"][0]["averageMarkChange"] = {"value": "<script>alert(1)</script>"}
+        state["commonRating"]["rankingPlaces"][1]["ranking"]["place"] = "x"
+        r = core.parse_rating(rating_feed(), state)
+        self.assertEqual(r["board"][0][3], "")
+        self.assertEqual(len(r["board"]), 4)                                            # строка без числового места пропущена
+
+    # ---- подробности оценки
+    def test_mark_details_class_distribution_and_places(self):
+        d = core.parse_mark_details(mark_details_json())
+        self.assertEqual(d, {"cm": [["5", 18, "Good"], ["3", 6, "Average"]], "avg": "3,07", "tr": "up", "mood": "Average", "pc": 4, "pp": 7})
+        self.assertNotIn("Тестова", json.dumps(d, ensure_ascii=False))                  # имя учителя не берём: оно уже в списке учителей
+        closed = core.parse_mark_details(mark_details_json(restricted=True))
+        self.assertNotIn("pc", closed)
+        self.assertEqual(core.parse_mark_details({}), {})
+
+    def test_only_new_and_fresh_marks_are_asked_for(self):
+        today = date(2026, 11, 11)
+        now = time.mktime(datetime(2026, 11, 11, 12).timetuple())
+        mk = lambda i, d: {"date": d, "lessons": [{"marks": [{"id": str(i), "value": "5", "created": d + "T08:00:00"}]}]}
+        history = {"2026-11-10": mk(1, "2026-11-10"), "2026-09-10": mk(2, "2026-09-10"), "2026-11-05": mk(3, "2026-11-05"), "2026-09-11": {"date": "2026-09-11", "lessons": [{"marks": [{"value": "4"}]}]}}
+        store = {"1": {"at": now - 3600}, "2": {"at": now - 99 * 3600}, "3": {"at": now - 7 * 3600}}
+        self.assertEqual(core.marks_pending(history, store, now), ["3"])                # 1 свежая и недавно спрашивали; 2 старая; 3 свежая и давно; без номера не спрашиваем
+        self.assertEqual(core.marks_pending(history, {}, now, limit=2), ["1", "3"])     # сначала самые новые, не больше limit
+        self.assertEqual(core.marks_pending(history, {}, now, limit=10), ["1", "3", "2"])
+
+    # ---- запросы к сайту и хранение
+    def test_fetch_rating_from_the_site(self):
+        r = core.fetch_rating(self.client, self.IDS, {"s1": "Рус. язык"})
+        self.assertEqual(r["class"]["total"], 3)
+        self.assertTrue(any("groupId=5001" in p for p in self.requests_to("/ratings/feed-widget")))     # текущий класс, не прошлогодний
+        self.assertEqual(len(self.requests_to("/ratings/subject")), 2)                  # по запросу на предмет
+        FakeSite.rating_mode = "nopage"
+        self.assertEqual(core.fetch_rating(self.client, self.IDS)["class"], {"place": 3, "trend": "up"})
+        FakeSite.good_token = "other"
+        with self.assertRaises(core.NeedLogin):
+            core.fetch_rating(self.client, self.IDS)
+
+    def test_sync_stores_and_publishes_rating_and_mark_details(self):
+        self.assertTrue(core.setup_login(self.data, "kate", "secret", base=self.base)[0])
+        payload = self.sync()
+        self.assertEqual(payload["rating"]["class"]["place"], 3)
+        self.assertEqual(payload["markInfo"]["9001"]["cm"][0], ["5", 18, "Good"])
+        self.assertNotIn("at", payload["markInfo"]["9001"])
+        self.assertEqual(payload["days"][0]["lessons"][0]["marks"][0]["id"], "9001")     # номер оценки сохранён в дневнике
+        for f in ("rating.json", "marks.json"):
+            self.assertEqual(oct(os.stat(self.data / f).st_mode)[-3:], "600", f)
+        text = self.out.read_text()
+        for foreign in ("Чужая", "example.org", "Тестова"):
+            self.assertNotIn(foreign, text)
+
+    def test_rating_is_not_asked_too_often_but_new_marks_refresh_it(self):
+        self.assertTrue(core.setup_login(self.data, "kate", "secret", base=self.base)[0])
+        self.sync()
+        FakeSite.paths, FakeSite.details_requests = [], 0
+        self.sync()                                                                      # сразу второй раз, оценок новых нет
+        self.assertEqual(self.requests_to("/ratings/"), [])
+        self.assertEqual(FakeSite.details_requests, 0)
+        old = time.time() - 2 * 3600
+        os.utime(self.data / "rating.json", (old, old))
+        self.sync()                                                                      # прошло больше часа
+        self.assertEqual(len(self.requests_to("/ratings/feed-widget")), 1)
+
+    def test_fresh_mark_details_are_refreshed_after_hours(self):
+        self.assertTrue(core.setup_login(self.data, "kate", "secret", base=self.base)[0])
+        self.sync()
+        saved = json.loads((self.data / "marks.json").read_text())
+        saved["items"]["9001"]["at"] = int(time.time()) - 7 * 3600
+        core.write_private(self.data / "marks.json", json.dumps(saved))
+        FakeSite.details_requests = 0
+        self.sync()
+        self.assertEqual(FakeSite.details_requests, 1)
+
+    def test_old_history_without_mark_numbers_is_loaded_again_once(self):
+        self.assertTrue(core.setup_login(self.data, "kate", "secret", base=self.base)[0])
+        core.write_private(self.data / "history.json", json.dumps({"2026-11-11": {"date": "2026-11-11", "weekday": "ср", "lessons": [
+            {"n": 1, "subject": "Рус. язык", "subjectId": "s1", "marks": [{"value": "5", "work": "Ответ на уроке", "created": "2026-11-11T07:00:00"}]}]}}))
+        FakeSite.paths = []
+        payload = self.sync()
+        first = len(self.requests_to("/api/v2/marks/diary"))
+        self.assertEqual(payload["days"][0]["lessons"][0]["marks"][0]["id"], "9001")
+        self.assertEqual(json.loads((self.data / "marks.json").read_text())["v"], core.MARKS_FORMAT)
+        FakeSite.paths = []
+        self.sync()
+        self.assertLess(len(self.requests_to("/api/v2/marks/diary")), first)             # второй раз весь период уже не запрашиваем
+
+    def test_failure_keeps_the_old_rating_and_the_diary_works(self):
+        self.assertTrue(core.setup_login(self.data, "kate", "secret", base=self.base)[0])
+        self.sync()
+        old = time.time() - 2 * 3600
+        os.utime(self.data / "rating.json", (old, old))
+        FakeSite.rating_mode = "fail"
+        payload = self.sync()
+        self.assertEqual(payload["rating"]["class"]["place"], 3)                         # прежний остался
+        self.assertEqual(payload["markInfo"]["9001"]["avg"], "3,07")
+        self.assertEqual(len(payload["days"]), 2)
+        self.assertFalse(payload["status"]["needLogin"])
+
+    def test_closed_rating_is_remembered_and_not_asked_every_time(self):
+        self.assertTrue(core.setup_login(self.data, "kate", "secret", base=self.base)[0])
+        self.sync()                                                                      # дневник загружен
+        core.write_private(self.data / "rating.json", "{}")                              # как будто сайт рейтинг не отдаёт
+        FakeSite.paths = []
+        payload = self.sync()
+        self.assertNotIn("rating", payload)
+        self.assertEqual(self.requests_to("/ratings/feed-widget"), [])                   # {} свежий: час не прошёл
+
+    def test_rebuild_and_failed_sync_keep_the_rating_and_details(self):
+        self.assertTrue(core.setup_login(self.data, "kate", "secret", base=self.base)[0])
+        self.sync()
+        core.rebuild(self.data, self.out)
+        saved = json.loads(self.out.read_text())
+        self.assertEqual((saved["rating"]["class"]["place"], saved["markInfo"]["9001"]["pp"]), (3, 7))
+        FakeSite.good_token, FakeSite.password = "other", "changed"                      # вход истёк, а пароль сменили
+        with self.assertRaises(core.NeedLogin):
+            self.sync()
+        self.assertEqual(json.loads(self.out.read_text())["rating"]["class"]["place"], 3)
+
+    def test_class_places_by_pupils_average(self):
+        board = [[1, 0, "4,90", "", 0, 0, 1], [2, 1, "4,80", "", 1, 0, 2], [3, 1, "4,60", "", 2, 1, 3], [4, 0, "4,10", "", 0, 0, 4], [5, 2, "x", "", 0, 0, 5]]
+        places, avgs = core.class_places(board)
+        self.assertEqual(avgs, {0: 4.5, 1: 4.7})                                       # строки без числа не считаются
+        self.assertEqual(places, {1: 1, 0: 2})
+        self.assertEqual(core.class_places([[1, 0, "4,5"], [2, 1, "4,5"]])[0], {0: 1, 1: 1})   # равный балл — равное место
+
+    def test_place_history_is_kept_per_day_and_restarts_with_a_new_period(self):
+        path = self.root / "hist.json"
+        r = self.parse()
+        items = core.update_rating_history(path, r, date(2026, 11, 10))
+        self.assertEqual(items[0]["c"], 3)
+        self.assertEqual(items[0]["s"]["Рус. язык"][:2], [4, 7])
+        r["class"]["place"] = 2
+        items = core.update_rating_history(path, r, date(2026, 11, 10))               # тот же день: запись заменяется
+        self.assertEqual([(x["d"], x["c"]) for x in items], [("2026-11-10", 2)])
+        items = core.update_rating_history(path, r, date(2026, 11, 11))
+        self.assertEqual(len(items), 2)
+        self.assertEqual(oct(os.stat(path).st_mode)[-3:], "600")
+        r["period"] = "2 триместр"
+        self.assertEqual(len(core.update_rating_history(path, r, date(2026, 12, 2))), 1)   # новый период — история заново
+        self.assertEqual(core.update_rating_history(path, None, date(2026, 12, 3)), [])
+
+    def test_sync_publishes_place_history(self):
+        self.assertTrue(core.setup_login(self.data, "kate", "secret", base=self.base)[0])
+        payload = self.sync()
+        self.assertEqual(payload["rating"]["history"][0]["d"], "2026-11-11")
+        self.assertNotIn("history", json.loads((self.data / "rating.json").read_text()))   # история хранится отдельно
+        self.assertIn("rating-history.json", core.LOGOUT_FILES)
+
+    def test_logout_wipes_rating_and_mark_details(self):
+        self.assertIn("rating.json", core.LOGOUT_FILES)
+        self.assertIn("marks.json", core.LOGOUT_FILES)
 
 
 class TeachersTests(unittest.TestCase):
