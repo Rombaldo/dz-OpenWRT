@@ -33,7 +33,8 @@ DEFAULT_SUBJECT = "mailto:noreply@example.com"      # контакт отпра�
 ALLOWED_HOSTS = {"fcm.googleapis.com", "android.googleapis.com", "web.push.apple.com", "updates.push.services.mozilla.com"}
 ALLOWED_SUFFIXES = (".push.apple.com", ".push.services.mozilla.com", ".notify.windows.com")
 HHMM = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
-PERMANENT = {400, 401, 403, 413}     # повторять бесполезно
+URGENCY = "high"                     # срочно: Android в спящем режиме не откладывает оценки и домашку (при "normal" задержка бывает минутами)
+PERMANENT = {400, 401, 403, 413}    # повторять бесполезно
 GONE = {404, 410}                    # подписка больше не существует
 
 
@@ -267,7 +268,7 @@ def message(m):
 def send_one(sub, m, vapid, subject, now, post):
     """Одно сообщение одному устройству. Возвращает код ответа службы пушей (None: сети нет)."""
     body = encrypt(message(m), sub["p256dh"], sub["auth"])
-    headers = {"Content-Encoding": "aes128gcm", "Content-Type": "application/octet-stream", "TTL": str(TTL), "Urgency": "normal",
+    headers = {"Content-Encoding": "aes128gcm", "Content-Type": "application/octet-stream", "TTL": str(TTL), "Urgency": URGENCY,
                "Authorization": vapid_authorization(sub["endpoint"], vapid, subject, now)}
     try:
         return post(sub["endpoint"], headers, body)[0]

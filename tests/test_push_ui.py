@@ -28,7 +28,7 @@ FAKES = """
   const reg = { pushManager: { sub: window.__preSub ? mkSub() : null,
     async getSubscription() { return this.sub; },
     async subscribe(o) { window.__push.reqs.push(["subscribe", o.userVisibleOnly, o.applicationServerKey.length]); this.sub = mkSub(); return this.sub; } } };
-  const sw = { async register(url, o) { window.__push.reqs.push(["register", url, o && o.scope]); return reg; }, ready: Promise.resolve(reg), async getRegistration() { return reg; } };
+  const sw = Object.assign(new EventTarget(), { async register(url, o) { window.__push.reqs.push(["register", url, o && o.scope]); return reg; }, ready: Promise.resolve(reg), async getRegistration() { return reg; } });
   Object.defineProperty(navigator, "serviceWorker", { value: sw, configurable: true });
   window.PushManager = function PushManager() {};
   const asked = window.__asked || "granted";
@@ -260,6 +260,28 @@ class SettingsTests(PushUiBase):
         page2.click("button[data-push=test]")
         page2.wait_for_selector(".set-card .msg.bad:has-text('нет связи')")
 
+    def test_check_goes_step_by_step_and_waits_for_the_push_to_arrive(self):
+        page = self.enabled()
+        page.evaluate("() => { window.__sw = null; }")
+        page.click("button[data-push=test]")
+        page.wait_for_selector(".diag li.ok:nth-child(3)")                    # браузер, разрешение и подключение проверены
+        labels = page.eval_on_selector_all(".diag li b", "els => els.map(e => e.textContent)")
+        self.assertEqual(labels, ["Браузер и адрес", "Разрешение на уведомления", "Устройство подключено к дневнику", "Тестовое уведомление дошло"])
+        page.wait_for_selector(".diag li.run:nth-child(4)")                   # роутер отправил, ждём подтверждения от телефона
+        self.assertIn("test", self.actions())
+        page.evaluate("() => navigator.serviceWorker.dispatchEvent(new MessageEvent('message', { data: { dnevnik: 'push', tag: 'test' } }))")
+        page.wait_for_selector(".diag li.ok:nth-child(4)")
+        self.assertIn("Пришло за", page.inner_text(".diag li:nth-child(4)"))
+
+    def test_check_names_the_step_that_failed(self):
+        page = self.enabled()
+        page.evaluate("() => { window.Notification.permission = 'denied'; }")
+        page.click("button[data-push=test]")
+        page.wait_for_selector(".diag li.bad:nth-child(2)")
+        self.assertIn("запрещены", page.inner_text(".diag li:nth-child(2)"))
+        self.assertEqual(page.locator(".diag li.ok").count(), 1)               # первый шаг прошёл, остальные не запускались
+        self.assertNotIn("test", self.actions())
+
     def test_disable_unsubscribes_on_the_router_and_in_the_browser(self):
         page = self.enabled()
         page.click("button[data-push=disable]")
@@ -375,6 +397,15 @@ class ServiceWorkerTests(PushUiBase):
         self.assertIn("closed1", r["log"])
         self.assertIn("focused1", r["log"])
         self.assertEqual(r["opened"], ["./?x=1", "./"])
+
+    def test_open_pages_are_told_that_the_push_arrived(self):
+        """Так «Проверка уведомлений» узнаёт, что тест дошёл до телефона (а не только ушёл с роутера)."""
+        r = self.run_sw("""const got = [];
+          self_.windows = [{ postMessage: (m) => got.push(m) }];
+          await fire("push", { data: { json: () => ({ title: "Проверка", body: "ок", tag: "test" }) } });
+          log.push(JSON.stringify(got));""")
+        self.assertIn('[{"dnevnik":"push","tag":"test"}]', r["log"])
+        self.assertEqual(len(r["shown"]), 1)                                  # уведомление при этом всё равно показано
 
     def test_it_never_touches_the_network_or_caches(self):
         text = (ROOT / "web" / "sw.js").read_text(encoding="utf-8")

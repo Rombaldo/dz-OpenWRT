@@ -943,7 +943,7 @@ class UiSmokeTests(unittest.TestCase):
             tops = {}
             for tab in ("hw", "marks", "plan"):
                 page.click(f'nav.tabs button[data-tab="{tab}"]')
-                page.wait_for_timeout(500)                                               # карточки въезжают снизу: меряем, когда встали на место
+                page.wait_for_function("() => !document.getAnimations().some((a) => a.playState === 'running' && ['rise', 'slideR', 'slideL'].includes(a.animationName))")   # карточки въезжают, страница уезжает вбок: меряем, когда всё встало на место
                 tops[tab] = page.evaluate("document.querySelector('main .grid > div > :first-child').getBoundingClientRect().top - document.querySelector('header').getBoundingClientRect().bottom")
             self.assertEqual(len({round(v) for v in tops.values()}), 1, f"верх экранов разный на {w}px: {tops}")
             self.assertGreaterEqual(min(tops.values()), 8)

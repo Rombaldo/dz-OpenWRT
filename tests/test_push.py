@@ -306,6 +306,13 @@ class HandleTests(PushBase):
 
 
 class DeliverTests(PushBase):
+    def test_every_push_is_urgent_so_android_does_not_hold_it_back(self):
+        """Оценки и домашка не должны ждать, пока телефон «проснётся»: в спящем режиме Android откладывает обычные пуши."""
+        self.add()
+        push.deliver(self.dir, self.ev("mark", 1), post=self.post)
+        self.assertEqual(self.read(FCM)[1]["Urgency"], "high")
+        self.assertEqual(push.URGENCY, "high")
+
     def test_message_is_encrypted_for_the_device_and_signed(self):
         self.add()
         stats = push.deliver(self.dir, self.ev("mark", 1), post=self.post)

@@ -14,7 +14,10 @@ self.addEventListener("push", (event) => {
     badge: "icon.png",
     lang: "ru",
     data: { url: d.url || "./" },
-  }));
+  }).then(() => self.clients.matchAll({ type: "window", includeUncontrolled: true })
+    // Открытой странице сообщаем, что пуш дошёл: так «Проверка уведомлений» узнаёт, что тест получен
+    .then((windows) => windows.forEach((w) => w.postMessage({ dnevnik: "push", tag: d.tag || "" })))
+    .catch(() => {})));
 });
 
 self.addEventListener("notificationclick", (event) => {
